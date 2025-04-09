@@ -1,65 +1,58 @@
+#include "claves.h"
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include "claves.h"
-
-user_t *add_user(user_t **head, const char *name, const char *ip, int port) {
-  if (head == NULL || name == NULL || ip == NULL) {
-    return NULL;
+int add_user(user_t **head, const char *name) {
+  if (!head || !name) {
+    return 2; // Error en parámetros
   }
 
-  // Comprobar si el usuario ya existe
+  // 1) Comprobar si el usuario ya existe
   user_t *temp = *head;
-  while (temp != NULL) {
+  while (temp) {
     if (strcmp(temp->name, name) == 0) {
-      // El usuario ya existe
-      return NULL;
+      return 1; // Usuario ya existe
     }
     temp = temp->next;
   }
 
-  // Crear el nuevo usuario
+  // 2) Reservar memoria para el nuevo usuario
   user_t *new_user = (user_t *) malloc(sizeof(user_t));
   if (!new_user) {
-    return NULL;
+    return 2; // Fallo de reserva
   }
-  memset(new_user, 0, sizeof(user_t));
 
+  // 3) Rellenar y enlazar
+  memset(new_user, 0, sizeof(user_t));
   strncpy(new_user->name, name, sizeof(new_user->name) - 1);
-  strncpy(new_user->ip, ip, sizeof(new_user->ip) - 1);
-  new_user->port = port;
   new_user->connected = false;
   new_user->files = NULL;
-  new_user->next = NULL;
-
-  // Insertar al inicio de la lista
   new_user->next = *head;
-  *head = new_user;
 
-  return new_user;
+  *head = new_user;
+  return 0; // Éxito
 }
 
 int remove_user(user_t **head, const char *name) {
-  if (head == NULL || *head == NULL || name == NULL) {
-    return -1;
+  if (!head || !*head || !name) {
+    return 2;
   }
 
   user_t *curr = *head;
   user_t *prev = NULL;
 
-  // Buscar el usuario en la lista
-  while (curr != NULL) {
+  while (curr) {
     if (strcmp(curr->name, name) == 0) {
-      // Encontrado: eliminar
-      if (prev == NULL) {
-        // Es el primero
+      // 1) Reencadenar la lista
+      if (!prev) {
         *head = curr->next;
       } else {
         prev->next = curr->next;
       }
 
-      // Eliminar también la lista de ficheros de este usuario
+      // 2) Eliminar la lista de ficheros
       file_t *f = curr->files;
       while (f) {
         file_t *aux = f;
@@ -67,128 +60,185 @@ int remove_user(user_t **head, const char *name) {
         free(aux);
       }
 
+      // 3) Liberar la estructura user
       free(curr);
-      return 0;
+      return 0; // Éxito
     }
     prev = curr;
     curr = curr->next;
   }
 
-  // No se ha encontrado
-  return -1;
+  // Usuario no encontrado
+  return 1;
 }
 
-user_t *find_user(user_t *head, const char *name) {
-  while (head != NULL) {
+int find_user(user_t *head, const char *name, user_t **out_user) {
+  if (!out_user || !name) {
+    return 2;
+  }
+
+  while (head) {
     if (strcmp(head->name, name) == 0) {
-      return head;
+      *out_user = head;
+      return 0; // Encontrado
     }
     head = head->next;
   }
-  return NULL;
+
+  // No encontrado
+  *out_user = NULL;
+  return 1;
 }
 
-void connect_user(user_t *head, const char *name) {
-  user_t *user = find_user(head, name);
-  if (user != NULL) {
-    user->connected = true;
+/**
+ * @brief Marca como 'conectado' a un usuario si existe.
+ *
+ * @param[in] head  Cabeza de la lista de usuarios.
+ * @param[in] name  Nombre del usuario a "conectar".
+ *
+ * @return int:
+ *   - 0 si se ha conectado correctamente.
+ *   - 1 si no existe.
+ *   - 2 en caso de error (parámetros nulos).
+ */
+int connect_user(user_t *head, const char *name, const char *ip, int port) {
+  if (!head || !name || !ip) {
+    return 2;
   }
+  if (port < 1024 || port > 65535) {
+    return 2; // Puerto no válido
+  }
+  user_t *usr = NULL;
+  int ret = find_user(head, name, &usr);
+  if (ret == 0 && usr) {
+    usr->connected = true;
+    usr->port = port;
+    strncpy(usr->ip, ip, sizeof(usr->ip) - 1);
+    return 0;
+  }
+  // Si find_user() devuelve 1 => no encontrado
+  return (ret == 1) ? 1 : 2;
 }
 
-file_t *add_file(user_t *user, const char *path, size_t size, const char *description) {
-  if (user == NULL || path == NULL || description == NULL) {
-    return NULL;
+int add_file(user_t *head, const char *username, const char *path, size_t size, const char *description) {
+  if (!head || !username || !path || !description) {
+    return 3;
   }
 
-  // Comprobar si el fichero ya existe
-  file_t *temp = user->files;
-  while (temp != NULL) {
+  // 1) Buscar al usuario
+  user_t *usr = NULL;
+  int ret_user = find_user(head, username, &usr);
+  if (ret_user != 0 || !usr) {
+    return 1; // no existe
+  }
+
+  // 2) Comprobar si ya existe ese fichero
+  file_t *temp = usr->files;
+  while (temp) {
     if (strcmp(temp->path, path) == 0) {
-      // Ya existe el fichero
-      return NULL;
+      return 2; // Fichero ya publicado
     }
     temp = temp->next;
   }
 
-  // Crear nuevo fichero
+  // 3) Crear el nuevo file
   file_t *new_file = (file_t *) malloc(sizeof(file_t));
   if (!new_file) {
-    return NULL;
+    return 3; // Error de memoria
   }
   memset(new_file, 0, sizeof(file_t));
-
   strncpy(new_file->path, path, sizeof(new_file->path) - 1);
   strncpy(new_file->description, description, sizeof(new_file->description) - 1);
   new_file->size = size;
-  new_file->next = NULL;
+  new_file->next = usr->files;
 
-  // Insertar al inicio de la lista
-  new_file->next = user->files;
-  user->files = new_file;
-
-  return new_file;
+  // 4) Enlazar
+  usr->files = new_file;
+  return 0; // Éxito
 }
 
-
-int remove_file(user_t *user, const char *path) {
-  if (user == NULL || path == NULL) {
-    return -1;
+int remove_file(user_t *head, const char *username, const char *path) {
+  if (!head || !username || !path) {
+    return 3;
   }
-  file_t *curr = user->files;
+
+  // 1) Buscar usuario
+  user_t *usr = NULL;
+  int ret_user = find_user(head, username, &usr);
+  if (ret_user != 0 || !usr) {
+    return 1; // usuario no existe
+  }
+
+  // 2) Buscar y eliminar el fichero
+  file_t *curr = usr->files;
   file_t *prev = NULL;
 
-  while (curr != NULL) {
+  while (curr) {
     if (strcmp(curr->path, path) == 0) {
-      // Encontrado: eliminar
-      if (prev == NULL) {
-        user->files = curr->next;
+      // encontrado: eliminar
+      if (!prev) {
+        usr->files = curr->next;
       } else {
         prev->next = curr->next;
       }
       free(curr);
-      return 0;
+      return 0; // Éxito
     }
     prev = curr;
     curr = curr->next;
   }
-  return -1;
+
+  // No se encontró el fichero
+  return 2;
 }
 
-file_t *find_file(const user_t *user, const char *path) {
-  if (user == NULL || path == NULL) {
-    return NULL;
+int find_file(user_t *head, const char *username, const char *path, file_t **out_file) {
+  if (!head || !username || !path || !out_file) {
+    return 3;
   }
-  file_t *temp = user->files;
-  while (temp != NULL) {
+
+  // 1) Buscar usuario
+  user_t *usr = NULL;
+  int ret_user = find_user(head, username, &usr);
+  if (ret_user != 0 || !usr) {
+    *out_file = NULL;
+    return 1; // usuario no existe
+  }
+
+  // 2) Recorrer ficheros
+  file_t *temp = usr->files;
+  while (temp) {
     if (strcmp(temp->path, path) == 0) {
-      return temp;
+      *out_file = temp;
+      return 0; // encontrado
     }
     temp = temp->next;
   }
-  return NULL;
+  *out_file = NULL;
+  return 2; // no se encontró el fichero
 }
 
 void destroy(user_t **head) {
-  if (head == NULL) {
+  if (!head) {
     return;
   }
 
   user_t *curr_user = *head;
-  while (curr_user != NULL) {
+  while (curr_user) {
     user_t *tmp_user = curr_user;
     curr_user = curr_user->next;
 
-    // Liberar la lista de ficheros de este usuario
+    // 1) Liberar la lista de ficheros
     file_t *curr_file = tmp_user->files;
-    while (curr_file != NULL) {
+    while (curr_file) {
       file_t *tmp_file = curr_file;
       curr_file = curr_file->next;
       free(tmp_file);
     }
 
-    // Liberar la estructura del usuario
+    // 2) Liberar la estructura user
     free(tmp_user);
   }
 
-  *head = NULL; // Dejamos el puntero principal en NULL
+  *head = NULL; // Lista vacía
 }

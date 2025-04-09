@@ -2,6 +2,7 @@
 #define CLAVES_H
 
 #include <stdbool.h>
+#include <stddef.h>
 
 // CABECERAS
 typedef struct user user_t;
@@ -32,83 +33,101 @@ struct user {
 };
 
 /**
- * @brief Añade un nuevo usuario a la lista enlazada.
+ * @brief Añade un nuevo usuario a la lista.
  *
- * @param[in,out] head Puntero al puntero de la cabeza de la lista de usuarios.
- * @param[in] name Nombre del usuario.
- * @param[in] ip Dirección IP del usuario.
- * @param[in] port Puerto del usuario.
+ * @param[in,out] head  Doble puntero a la cabeza de la lista de usuarios.
+ * @param[in]     name  Nombre del usuario.
+ * @param[in]     ip    Dirección IP del usuario.
+ * @param[in]     port  Puerto del usuario.
  *
- * @return Puntero al nuevo usuario si se ha añadido correctamente, NULL si ya existía
- *         un usuario con el mismo nombre o en caso de error.
+ * @return int:
+ *   - 0 si se ha añadido correctamente.
+ *   - 1 si el usuario ya existe.
+ *   - 2 en caso de error (parámetros nulos o fallo al reservar memoria).
  */
-user_t *add_user(user_t **head, const char *name, const char *ip, int port);
+int add_user(user_t **head, const char *name);
 
 /**
- * @brief Elimina un usuario de la lista enlazada.
+ * @brief Elimina de la lista al usuario cuyo nombre coincide.
  *
- * @param[in,out] head Puntero al puntero de la cabeza de la lista.
- * @param[in] name Nombre del usuario a eliminar.
+ * @param[in,out] head  Doble puntero a la cabeza de la lista de usuarios.
+ * @param[in]     name  Nombre del usuario a eliminar.
  *
- * @return 0 si se eliminó correctamente, -1 si no se encontró o hubo error.
+ * @return int:
+ *   - 0 si se elimina correctamente.
+ *   - 1 si no se encuentra el usuario.
+ *   - 2 en caso de error (parámetros nulos).
  */
 int remove_user(user_t **head, const char *name);
 
 /**
- * @brief Busca un usuario en la lista por su nombre.
+ * @brief Busca a un usuario por nombre y lo devuelve via parámetro 'out_user'.
  *
- * @param[in] head Puntero a la cabeza de la lista.
- * @param[in] name Nombre del usuario a buscar.
+ * @param[in]  head       Cabeza de la lista de usuarios.
+ * @param[in]  name       Nombre del usuario a buscar.
+ * @param[out] out_user   Puntero que contendrá la dirección del usuario hallado.
  *
- * @return Puntero al usuario encontrado, o NULL si no se encuentra.
+ * @return int:
+ *   - 0 si se encuentra y se devuelve en out_user.
+ *   - 1 si no se encuentra.
+ *   - 2 en caso de error (parámetros nulos).
  */
-user_t *find_user(user_t *head, const char *name);
+int find_user(user_t *head, const char *name, user_t **out_user);
 
 /**
- * @brief Añade un fichero a la lista de ficheros de un usuario.
+ * @brief Añade un fichero a la lista del usuario 'username'.
  *
- * @param[in,out] user Puntero al usuario.
- * @param[in] path Ruta absoluta del fichero.
- * @param[in] size Tamaño del fichero.
- * @param[in] description Descripción del fichero.
+ * @param[in] head         Cabeza de la lista de usuarios.
+ * @param[in] username     Nombre del usuario dueño del fichero.
+ * @param[in] path         Ruta del fichero.
+ * @param[in] size         Tamaño del fichero en bytes.
+ * @param[in] description  Descripción del fichero.
  *
- * @return Puntero al fichero añadido, o NULL si ya existía o hubo error.
+ * @return int:
+ *   - 0 si se añade correctamente.
+ *   - 1 si el usuario no existe.
+ *   - 2 si el fichero ya estaba publicado por ese usuario.
+ *   - 3 si ocurre otro error (parámetros nulos o fallo en malloc).
  */
-file_t *add_file(user_t *user, const char *path, size_t size, const char *description);
+int add_file(user_t *head, const char *username,
+             const char *path, size_t size, const char *description);
 
 /**
- * @brief Elimina un fichero publicado por un usuario.
+ * @brief Elimina un fichero 'path' de la lista del usuario 'username'.
  *
- * @param[in,out] user Puntero al usuario.
- * @param[in] path Ruta del fichero a eliminar.
+ * @param[in] head       Cabeza de la lista de usuarios.
+ * @param[in] username   Nombre del usuario dueño del fichero.
+ * @param[in] path       Ruta del fichero a eliminar.
  *
- * @return 0 si se eliminó correctamente, -1 si no se encontró o hubo error.
+ * @return int:
+ *   - 0 si se elimina correctamente.
+ *   - 1 si no existe el usuario.
+ *   - 2 si el fichero no existe.
+ *   - 3 en caso de error (parámetros nulos).
  */
-int remove_file(user_t *user, const char *path);
+int remove_file(user_t *head, const char *username, const char *path);
 
 /**
- * @brief Busca un fichero dentro de la lista de ficheros de un usuario.
+ * @brief Busca un fichero 'path' dentro del usuario 'username' y, si lo halla, lo devuelve en *out_file.
  *
- * @param[in] user Puntero al usuario.
- * @param[in] path Ruta del fichero a buscar.
+ * @param[in]  head       Cabeza de la lista de usuarios.
+ * @param[in]  username   Nombre del usuario.
+ * @param[in]  path       Ruta del fichero a buscar.
+ * @param[out] out_file   Puntero al que se asignará el fichero hallado (o NULL si no se halla).
  *
- * @return Puntero al fichero encontrado, o NULL si no existe.
+ * @return int:
+ *   - 0 si se encuentra.
+ *   - 1 si no existe el usuario.
+ *   - 2 si el fichero no existe.
+ *   - 3 en caso de error (parámetros nulos).
  */
-file_t *find_file(const user_t *user, const char *path);
+int find_file(user_t *head, const char *username, const char *path, file_t **out_file);
 
 /**
  * @brief Libera toda la memoria asociada a la lista de usuarios y sus ficheros.
  *
- * @param[in,out] head Puntero al puntero de la cabeza de la lista de usuarios.
+ * @param[in,out] head Doble puntero a la cabeza de la lista.
  */
 void destroy(user_t **head);
-
-/**
- * @brief Conecta un usuario, marcando su estado como conectado.
- *
- * @param[in] head Puntero a la cabeza de la lista de usuarios.
- * @param[in] name Nombre del usuario a conectar.
- */
-void connect_user(user_t *head, const char *name);
 
 #endif // CLAVES_H

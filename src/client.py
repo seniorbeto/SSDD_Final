@@ -38,7 +38,8 @@ class client:
 
         try:
             sck.sendall("REGISTER\0".encode())
-            sck.sendall(user.encode())
+            username = user + "\0"
+            sck.sendall(username.encode())
 
             # Una vez enviado el nombre de usuario, se espera la respuesta del servidor
             response = sck.recv(1).decode()

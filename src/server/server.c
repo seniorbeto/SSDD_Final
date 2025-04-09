@@ -10,7 +10,9 @@
 #include "lines.h"
 #include "stdbool.h"
 
-#define MAX_MSG_SIZE 1024
+#define MAX_MSG_SIZE 2048
+#define MAX_OP_MSG_SIZE 64
+#define MAX_USER_MSG_SIZE 255
 
 pthread_mutex_t req_lock = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t req_cond = PTHREAD_COND_INITIALIZER;
@@ -19,6 +21,9 @@ bool req_ready = false;
 // Variables globales
 int server_sock;
 user_t *usuarios = NULL;
+
+// Cabeceras
+int handle_register(int socket);
 
 void handle_poweroff() {
   close(server_sock);
@@ -37,8 +42,37 @@ void *handle_request(void *arg) {
   pthread_cond_signal(&req_cond);
   pthread_mutex_unlock(&req_lock);
 
-  printf("[INFO (sock %d)] Cliente conectado por socket con descriptor: %d\n", client_sock, client_sock);
+  //printf("[INFO (sock %d)] Cliente conectado por socket con descriptor: %d\n", client_sock, client_sock);
 
+  // Primero, leemos la operación
+  char operation[MAX_OP_MSG_SIZE];
+  memset(operation, 0, MAX_OP_MSG_SIZE);
+
+  const ssize_t bytes_read = read_line(client_sock, operation, MAX_OP_MSG_SIZE);
+  if (bytes_read <= 0) {
+    perror("[ERROR] al leer la operación del cliente");
+    close(client_sock);
+    return NULL;
+  }
+
+  char user[MAX_USER_MSG_SIZE];
+  memset(user, 0, MAX_USER_MSG_SIZE);
+
+  const ssize_t bytes_read_user = read_line(client_sock, user, MAX_USER_MSG_SIZE);
+  if (bytes_read_user <= 0) {
+    perror("[ERROR] al leer el usuario del cliente");
+    close(client_sock);
+    return NULL;
+  }
+
+  printf("s> OPERATION %s FROM %s\n", operation, user);
+
+  // Aquí se realizan las operaciones
+  if (strcmp(operation, "REGISTER") == 0) {
+
+  } else {
+    printf("[ERROR] Operación no válida: %s\n", operation);
+  }
 
   return NULL;
 }
@@ -93,7 +127,7 @@ int main(int argc, char *argv[]) {
     exit(EXIT_FAILURE);
   }
 
-  printf("Servidor iniciado. Escuchando en el puerto %d. Esperando peticiones...\n", port);
+  printf("s> init server %s:%u\n", inet_ntoa(server_addr.sin_addr), ntohs(server_addr.sin_port));
 
   while (1) {
     struct sockaddr_in client_addr;

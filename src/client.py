@@ -54,7 +54,7 @@ class client:
             elif response == "2":
                 print("REGISTER FAIL")
             else:
-                print("UNKNOWN RESPONSE FROM SERVER")
+                print("UNKNOWN RESPONSE FROM SERVER: ", response)
         except Exception as e:
             print("Error: " + str(e))
             sck.close()

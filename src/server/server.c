@@ -23,13 +23,36 @@ int server_sock;
 user_t *usuarios = NULL;
 
 // Cabeceras
-int handle_register(int socket);
+void handle_register(int socket, char *user);
 
 void handle_poweroff() {
   close(server_sock);
   destroy(&usuarios);
   printf("\nSaliendo del servidor...\n");
   exit(EXIT_SUCCESS);
+}
+
+/*
+ * Función auxiliar para enviar un valor entero al cliente en formato ascii + \0
+ */
+int send_ret_value(int socket, int ret) {
+  // Transformamos el valor de retorno en ascii y lo enviamos al cliente
+  char ret_str[16] = {0};
+  snprintf(ret_str, sizeof(ret_str), "%d", ret);
+  ret_str[sizeof(ret_str) - 1] = '\0';
+  ssize_t bytes_sent = send_message(socket, ret_str, sizeof(ret_str));
+  if (bytes_sent == -1) {
+    return -1;
+  }
+  return 0;
+}
+
+void handle_register(int socket, char *user) {
+  // En la operación register, solo hace falta el código de operación y el nombre de usuario
+  int res = add_user(&usuarios, user);
+  if (send_ret_value(socket, res) != 0) {
+    printf("s> error sending return value to %s", user);
+  }
 }
 
 void *handle_request(void *arg) {
@@ -42,7 +65,7 @@ void *handle_request(void *arg) {
   pthread_cond_signal(&req_cond);
   pthread_mutex_unlock(&req_lock);
 
-  //printf("[INFO (sock %d)] Cliente conectado por socket con descriptor: %d\n", client_sock, client_sock);
+  // printf("[INFO (sock %d)] Cliente conectado por socket con descriptor: %d\n", client_sock, client_sock);
 
   // Primero, leemos la operación
   char operation[MAX_OP_MSG_SIZE];
@@ -50,7 +73,7 @@ void *handle_request(void *arg) {
 
   const ssize_t bytes_read = read_line(client_sock, operation, MAX_OP_MSG_SIZE);
   if (bytes_read <= 0) {
-    perror("[ERROR] al leer la operación del cliente");
+    perror("s> error reading operation");
     close(client_sock);
     return NULL;
   }
@@ -60,7 +83,7 @@ void *handle_request(void *arg) {
 
   const ssize_t bytes_read_user = read_line(client_sock, user, MAX_USER_MSG_SIZE);
   if (bytes_read_user <= 0) {
-    perror("[ERROR] al leer el usuario del cliente");
+    perror("s> error reading user");
     close(client_sock);
     return NULL;
   }
@@ -69,10 +92,12 @@ void *handle_request(void *arg) {
 
   // Aquí se realizan las operaciones
   if (strcmp(operation, "REGISTER") == 0) {
-
+    handle_register(client_sock, user);
   } else {
-    printf("[ERROR] Operación no válida: %s\n", operation);
+    printf("s> unknown operation: %s\n", operation);
   }
+
+  close(client_sock);
 
   return NULL;
 }

@@ -25,6 +25,7 @@ user_t *usuarios = NULL;
 // Cabeceras
 void handle_register(int socket, char *user);
 void handle_unregister(int socket, char *user);
+void handle_connect(int socket, char *user);
 
 void handle_poweroff() {
   close(server_sock);
@@ -59,6 +60,37 @@ void handle_register(int socket, char *user) {
 void handle_unregister(int socket, char *user) {
   // En la operación unregister, solo hace falta el código de operación y el nombre de usuario
   int res = remove_user(&usuarios, user);
+  if (send_ret_value(socket, res) != 0) {
+    printf("s> error sending return value to %s", user);
+  }
+}
+
+void handle_connect(int socket, char *user) {
+  // En este caso, todavía nos falta por llegar el puerto del cliente
+  char port_str[16] = {0};
+  ssize_t bytes_read = read_line(socket, port_str, sizeof(port_str));
+  port_str[sizeof(port_str) - 1] = '\0';
+  if (bytes_read <= 0) {
+    perror("s> error reading port");
+    close(socket);
+    return;
+  }
+  int port = atoi(port_str);
+  if (port < 1024 || port > 65535) {
+    perror("s> invalid port");
+    close(socket);
+    return;
+  }
+  // Ahora, obtenemos la dirección IP del cliente
+  struct sockaddr_in client_addr;
+  socklen_t client_addr_len = sizeof(client_addr);
+  if (getpeername(socket, (struct sockaddr *) &client_addr, &client_addr_len) == -1) {
+    perror("s> error getting client address");
+    close(socket);
+    return;
+  }
+
+  int res = connect_user(&usuarios, user, inet_ntoa(client_addr.sin_addr), port);
   if (send_ret_value(socket, res) != 0) {
     printf("s> error sending return value to %s", user);
   }
@@ -104,6 +136,8 @@ void *handle_request(void *arg) {
     handle_register(client_sock, user);
   } else if (strcmp(operation, "UNREGISTER") == 0) {
     handle_unregister(client_sock, user);
+  } else if (strcmp(operation, "CONNECT") == 0) {
+    handle_connect(client_sock, user);
   } else {
     printf("s> unknown operation: %s\n", operation);
   }

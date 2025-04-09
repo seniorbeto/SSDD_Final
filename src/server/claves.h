@@ -75,6 +75,19 @@ int remove_user(user_t **head, const char *name);
 int find_user(user_t *head, const char *name, user_t **out_user);
 
 /**
+ * @brief Marca como 'conectado' a un usuario si existe.
+ *
+ * @param[in] head  Cabeza de la lista de usuarios.
+ * @param[in] name  Nombre del usuario a "conectar".
+ *
+ * @return int:
+ *   - 0 si se ha conectado correctamente.
+ *   - 1 si no existe.
+ *   - 2 en caso de error (parámetros nulos).
+ */
+int connect_user(user_t **head, const char *name, const char *ip, int port);
+
+/**
  * @brief Añade un fichero a la lista del usuario 'username'.
  *
  * @param[in] head         Cabeza de la lista de usuarios.

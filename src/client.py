@@ -1,5 +1,5 @@
 from enum import Enum
-
+import threading
 import argparse
 import socket
 
@@ -12,19 +12,16 @@ class client:
     # * @brief Return codes for the protocol methods
 
     class RC(Enum):
-
         OK = 0
-
         ERROR = 1
-
         USER_ERROR = 2
 
     # ****************** ATTRIBUTES ******************
-
     _server = None
-
     _port = -1
-
+    _listen_thread = None
+    _listen_port = None
+    _listen_socket = None
     # ******************** METHODS *******************
 
     @staticmethod
@@ -95,8 +92,72 @@ class client:
 
     @staticmethod
     def connect(user):
+        if len(user) < 0 or len(user) > 255:
+            print("Error: Invalid username length")
+            return client.RC.USER_ERROR
 
-        #  Write your code here
+        sck = None
+        success = False
+        try:
+            # Antes de mandar nada al servidor, vamos a crear el socket de escucha
+            client._listen_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            client._listen_socket.bind(('', 0))  # Lo bindeamos al primer puerto que esté libre
+            client._listen_socket.listen(10)
+
+            # Obtenemos el puerto asignado
+            client._listen_port = client._listen_socket.getsockname()[1]
+
+            # Ahora que tenemos el socket de escucha, desplegamos el hilo que permitirá conexiones
+            # entrantes de otros clientes
+            client._listen_thread = threading.Thread(target=client._downloads_handler, daemon=True)
+            client._listen_thread.start()
+
+            # AHORA ya podemos enviar cosas al servidor
+            sck = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sck.connect((client._server, client._port))
+
+            sck.sendall("CONNECT\0".encode())
+            username = user + "\0"
+            sck.sendall(username.encode())
+            listen_port = str(client._listen_port) + "\0"
+            sck.sendall(listen_port.encode())
+
+            res = sck.recv(1)
+            if not res:
+                print("c> CONNECT FAIL")
+                sck.close()
+                return client.RC.ERROR
+
+            response = res.decode()
+            if response == "0":
+                print("c> CONNECT OK")
+                success = True
+                sck.close()
+                return client.RC.OK
+            elif response == "1":
+                print("c> CONNECT FAIL, USER DOES NOT EXIST")
+                sck.close()
+                return client.RC.USER_ERROR
+            elif response == "2":
+                print("c> USER ALREADY CONNECTED")
+                sck.close()
+                return client.RC.USER_ERROR
+            elif response == "3":
+                print("c> CONNECT FAIL")
+                sck.close()
+                return client.RC.ERROR
+            else:
+                print("c> UNKNOWN RESPONSE FROM SERVER: ", response)
+        except Exception as e:
+            print("c> CONNECT FAIL")
+        finally:
+            if sck:
+                sck.close()
+            # Cerrar el socket de escucha si se produce un error
+            if not success and client._listen_socket:
+                client._listen_socket.close()
+                client._listen_socket = None
+                client._listen_port = None
 
         return client.RC.ERROR
 
@@ -141,6 +202,22 @@ class client:
         #  Write your code here
 
         return client.RC.ERROR
+
+    @staticmethod
+    def _downloads_handler():
+        """
+        Hilo que escucha conexiones entrantes de otros clientes.
+        """
+        print("[DOWNLOAD THREAD] Hilo de escucha iniciado.")
+        while True:
+            try:
+                conn, addr = client._listen_socket.accept()
+                print(f"[DOWNLOAD THREAD] Conexión entrante de {addr}")
+                conn.close()
+            except Exception as e: # Se produce cuando el socket de escucha se cierra
+                break
+
+        print("[DOWNLOAD THREAD] Socket de escucha cerrado. Saliendo del hilo.")
 
     # *
 

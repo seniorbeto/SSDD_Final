@@ -101,23 +101,26 @@ int find_user(user_t *head, const char *name, user_t **out_user) {
  *   - 1 si no existe.
  *   - 2 en caso de error (parámetros nulos).
  */
-int connect_user(user_t *head, const char *name, const char *ip, int port) {
+int connect_user(user_t **head, const char *name, const char *ip, int port) {
   if (!head || !name || !ip) {
-    return 2;
+    return 3;
   }
   if (port < 1024 || port > 65535) {
-    return 2; // Puerto no válido
+    return 3; // Puerto no válido
   }
   user_t *usr = NULL;
-  int ret = find_user(head, name, &usr);
+  int ret = find_user(*head, name, &usr);
   if (ret == 0 && usr) {
+    if (usr->connected) {
+      return 2; // Ya está conectado
+    }
     usr->connected = true;
     usr->port = port;
     strncpy(usr->ip, ip, sizeof(usr->ip) - 1);
     return 0;
   }
   // Si find_user() devuelve 1 => no encontrado
-  return (ret == 1) ? 1 : 2;
+  return (ret == 1) ? 1 : 3;
 }
 
 int add_file(user_t *head, const char *username, const char *path, size_t size, const char *description) {

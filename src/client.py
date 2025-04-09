@@ -1,6 +1,7 @@
 from enum import Enum
 
 import argparse
+import socket
 
 
 class client:
@@ -27,12 +28,39 @@ class client:
     # ******************** METHODS *******************
 
     @staticmethod
-    def register(user):
+    def register(user: str):
+        if len(user) < 0 or len(user) > 255:
+            print("Error: Invalid username length")
+            return client.RC.USER_ERROR
 
-        #  Write your code here
+        sck = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sck.connect((client._server, client._port))
 
+        try:
+            sck.sendall("REGISTER\0".encode())
+            sck.sendall(user.encode())
+
+            # Una vez enviado el nombre de usuario, se espera la respuesta del servidor
+            response = sck.recv(1).decode()
+            if response == "0":
+                print("REGISTER OK")
+                sck.close()
+                return client.RC.OK
+            elif response == "1":
+                print("USERNAME IN USE")
+                sck.close()
+                return client.RC.USER_ERROR
+            elif response == "2":
+                print("REGISTER FAIL")
+            else:
+                print("UNKNOWN RESPONSE FROM SERVER")
+        except Exception as e:
+            print("Error: " + str(e))
+            sck.close()
+            return client.RC.ERROR
+
+        sck.close()
         return client.RC.ERROR
-
     @staticmethod
     def unregister(user):
 
@@ -109,7 +137,6 @@ class client:
                 if (len(line) > 0):
 
                     line[0] = line[0].upper()
-
                     if (line[0] == "REGISTER"):
 
                         if (len(line) == 2):

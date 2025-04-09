@@ -44,28 +44,52 @@ class client:
             # Una vez enviado el nombre de usuario, se espera la respuesta del servidor
             response = sck.recv(1).decode()
             if response == "0":
-                print("REGISTER OK")
+                print("c> REGISTER OK")
                 sck.close()
                 return client.RC.OK
             elif response == "1":
-                print("USERNAME IN USE")
+                print("c> USERNAME IN USE")
                 sck.close()
                 return client.RC.USER_ERROR
             elif response == "2":
-                print("REGISTER FAIL")
+                print("c> REGISTER FAIL")
             else:
                 print("UNKNOWN RESPONSE FROM SERVER: ", response)
         except Exception as e:
-            print("Error: " + str(e))
-            sck.close()
-            return client.RC.ERROR
+            print("c> REGISTER FAIL")
 
         sck.close()
         return client.RC.ERROR
     @staticmethod
     def unregister(user):
+        if len(user) < 0 or len(user) > 255:
+            print("Error: Invalid username length")
+            return client.RC.USER_ERROR
 
-        #  Write your code here
+        sck = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sck.connect((client._server, client._port))
+
+        try:
+            sck.sendall("UNREGISTER\0".encode())
+            username = user + "\0"
+            sck.sendall(username.encode())
+
+            # Una vez enviado el nombre de usuario, se espera la respuesta del servidor
+            response = sck.recv(1).decode()
+            if response == "0":
+                print("c> UNREGISTER OK")
+                sck.close()
+                return client.RC.OK
+            elif response == "1":
+                print("c> USER DOES NOT EXIST")
+                sck.close()
+                return client.RC.USER_ERROR
+            elif response == "2":
+                print("c> UNREGISTER FAIL")
+            else:
+                print("c> UNKNOWN RESPONSE FROM SERVER: ", response)
+        except Exception as e:
+            print("c> UNREGISTER FAIL")
 
         return client.RC.ERROR
 

@@ -24,6 +24,7 @@ user_t *usuarios = NULL;
 
 // Cabeceras
 void handle_register(int socket, char *user);
+void handle_unregister(int socket, char *user);
 
 void handle_poweroff() {
   close(server_sock);
@@ -50,6 +51,14 @@ int send_ret_value(int socket, int ret) {
 void handle_register(int socket, char *user) {
   // En la operación register, solo hace falta el código de operación y el nombre de usuario
   int res = add_user(&usuarios, user);
+  if (send_ret_value(socket, res) != 0) {
+    printf("s> error sending return value to %s", user);
+  }
+}
+
+void handle_unregister(int socket, char *user) {
+  // En la operación unregister, solo hace falta el código de operación y el nombre de usuario
+  int res = remove_user(&usuarios, user);
   if (send_ret_value(socket, res) != 0) {
     printf("s> error sending return value to %s", user);
   }
@@ -93,6 +102,8 @@ void *handle_request(void *arg) {
   // Aquí se realizan las operaciones
   if (strcmp(operation, "REGISTER") == 0) {
     handle_register(client_sock, user);
+  } else if (strcmp(operation, "UNREGISTER") == 0) {
+    handle_unregister(client_sock, user);
   } else {
     printf("s> unknown operation: %s\n", operation);
   }

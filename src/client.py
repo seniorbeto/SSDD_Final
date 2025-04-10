@@ -252,7 +252,7 @@ class client:
             return client.RC.USER_ERROR
 
         if client._current_user_connected is None:
-            print("Error: No user is connected")
+            print("c> PUBLISH FAIL, USER NOT CONNECTED")
             return client.RC.USER_ERROR
 
         sck = None
@@ -303,8 +303,71 @@ class client:
 
     @staticmethod
     def delete(fileName):
+        if len(fileName) < 0 or len(fileName) > 255:
+            print("Error: Invalid filename length")
+            return client.RC.USER_ERROR
 
-        #  Write your code here
+        # Comprobamos que el path no tenga espacios en blanco
+        if " " in fileName:
+            print("Error: Invalid filename, blank spaces not allowed")
+            return client.RC.USER_ERROR
+
+        # Comprobamos que el fichero exista
+        if not os.path.isfile(fileName):
+            print("Error: File does not exist")
+            return client.RC.USER_ERROR
+
+        # Verificamos que el path sea absoluto y en caso de que no lo sea, lo convertimos
+        if not os.path.isabs(fileName):
+            fileName = os.path.abspath(fileName)
+            if len(fileName) < 0 or len(fileName) > 255:
+                print("Error: Invalid filename length while converting to absolute path")
+                return client.RC.USER_ERROR
+
+        if client._current_user_connected is None:
+            print("c> DELETE FAIL, USER NOT CONNECTED")
+            return client.RC.USER_ERROR
+
+        sck = None
+        try:
+            sck = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sck.connect((client._server, client._port))
+            sck.sendall("DELETE\0".encode())
+            username = client._current_user_connected + "\0"
+            sck.sendall(username.encode())
+
+            # Ahora enviamos el path
+            fileName = fileName + "\0"
+            sck.sendall(fileName.encode())
+
+            response = int.from_bytes(sck.recv(1), byteorder='big')
+            if response == 0:
+                print("c> DELETE OK")
+                sck.close()
+                return client.RC.OK
+            elif response == 1:
+                print("c> DELETE FAIL, USER DOES NOT EXIST")
+                sck.close()
+                return client.RC.USER_ERROR
+            elif response == 2:
+                print("c> DELETE FAIL, USER NOT CONNECTED")
+                sck.close()
+                return client.RC.USER_ERROR
+            elif response == 3:
+                print("c> DELETE FAIL, CONTENT NOT PUBLISHED")
+                sck.close()
+                return client.RC.USER_ERROR
+            elif response == 4:
+                print("c> DELETE FAIL")
+                sck.close()
+                return client.RC.USER_ERROR
+            else:
+                print("c> UNKNOWN RESPONSE FROM SERVER: ", response)
+        except Exception as e:
+            print("c> DELETE CLIENT ERROR - ", str(e))
+        finally:
+            if sck:
+                sck.close()
 
         return client.RC.ERROR
 

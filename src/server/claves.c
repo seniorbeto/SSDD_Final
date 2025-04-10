@@ -185,19 +185,24 @@ int add_file(user_t **head, const char *username, const char *path, const char *
   return 0; // Éxito
 }
 
-int remove_file(user_t *head, const char *username, const char *path) {
+int remove_file(user_t **head, const char *username, const char *path) {
   if (!head || !username || !path) {
-    return 3;
+    return 4;
   }
 
-  // 1) Buscar usuario
+  // Buscar usuario
   user_t *usr = NULL;
-  int ret_user = find_user(head, username, &usr);
+  int ret_user = find_user(*head, username, &usr);
   if (ret_user != 0 || !usr) {
     return 1; // usuario no existe
   }
 
-  // 2) Buscar y eliminar el fichero
+  // Comprobamos si el usuario está conectado
+  if (!usr->connected) {
+    return 2; // usuario no conectado
+  }
+
+  // Buscar y eliminar el fichero
   file_t *curr = usr->files;
   file_t *prev = NULL;
 
@@ -217,7 +222,7 @@ int remove_file(user_t *head, const char *username, const char *path) {
   }
 
   // No se encontró el fichero
-  return 2;
+  return 3;
 }
 
 int find_file(user_t *head, const char *username, const char *path, file_t **out_file) {

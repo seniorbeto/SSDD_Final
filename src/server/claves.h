@@ -129,10 +129,11 @@ int add_file(user_t **head, const char *username, const char *path, const char *
  * @return int:
  *   - 0 si se elimina correctamente.
  *   - 1 si no existe el usuario.
- *   - 2 si el fichero no existe.
- *   - 3 en caso de error (parámetros nulos).
+ *   - 2 si el usuario no está conectado.
+ *   - 3 si el fichero no existe.
+ *   - 4 si ocurre otro error (parámetros nulos).
  */
-int remove_file(user_t *head, const char *username, const char *path);
+int remove_file(user_t **head, const char *username, const char *path);
 
 /**
  * @brief Busca un fichero 'path' dentro del usuario 'username' y, si lo halla, lo devuelve en *out_file.

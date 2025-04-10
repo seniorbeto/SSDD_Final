@@ -30,6 +30,7 @@ void handle_unregister(int socket, char *user);
 void handle_connect(int socket, char *user);
 void handle_disconnect(int socket, char *user);
 void handle_publish(int socket, char *user);
+void handle_delete(int socket, char *user);
 
 void handle_poweroff() {
   close(server_sock);
@@ -133,6 +134,22 @@ void handle_publish(int socket, char *user) {
   }
 }
 
+void handle_delete(int socket, char *user) {
+  char file_path[MAX_FILE_PATH_SIZE] = {0};
+  ssize_t bytes_read = read_line(socket, file_path, sizeof(file_path));
+  file_path[sizeof(file_path) - 1] = '\0'; // Por si acaso
+  if (bytes_read <= 0) {
+    perror("s> error reading file path");
+    close(socket);
+    return;
+  }
+
+  int res = remove_file(&usuarios, user, file_path);
+  if (send_ret_value(socket, (uint8_t) res) != 0) {
+    printf("s> error sending return value to %s", user);
+  }
+}
+
 void *handle_request(void *arg) {
   int client_sock;
 
@@ -179,6 +196,8 @@ void *handle_request(void *arg) {
     handle_disconnect(client_sock, user);
   } else if (strcmp(operation, "PUBLISH") == 0) {
     handle_publish(client_sock, user);
+  } else if (strcmp(operation, "DELETE") == 0) {
+    handle_delete(client_sock, user);
   } else {
     printf("s> unknown operation: %s\n", operation);
   }

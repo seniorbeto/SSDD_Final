@@ -123,6 +123,27 @@ int connect_user(user_t **head, const char *name, const char *ip, int port) {
   return (ret == 1) ? 1 : 3;
 }
 
+int disconnect_user(user_t **head, const char *name) {
+  if (!head || !name) {
+    return 3;
+  }
+
+  user_t *usr = NULL;
+  int ret = find_user(*head, name, &usr);
+  if (ret == 0 && usr) {
+    if (!usr->connected) {
+      return 2; // No está conectado
+    }
+    usr->connected = false;
+    usr->port = 0;
+    memset(usr->ip, 0, sizeof(usr->ip)); // Limpiar IP
+    return 0; // Éxito
+  }
+  // Si find_user() devuelve 1 => no encontrado
+  return (ret == 1) ? 1 : 3;
+
+}
+
 int add_file(user_t *head, const char *username, const char *path, size_t size, const char *description) {
   if (!head || !username || !path || !description) {
     return 3;

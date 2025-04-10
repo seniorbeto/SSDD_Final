@@ -22,6 +22,7 @@ class client:
     _listen_thread = None
     _listen_port = None
     _listen_socket = None
+    _users_connected = []
     # ******************** METHODS *******************
 
     @staticmethod
@@ -39,21 +40,22 @@ class client:
             sck.sendall(username.encode())
 
             # Una vez enviado el nombre de usuario, se espera la respuesta del servidor
-            response = sck.recv(1).decode()
-            if response == "0":
+            # Recibimos el primer byte de la respuesta, codificado en formato de red
+            response = int.from_bytes(sck.recv(1), byteorder='big')
+            if response == 0:
                 print("c> REGISTER OK")
                 sck.close()
                 return client.RC.OK
-            elif response == "1":
+            elif response == 1:
                 print("c> USERNAME IN USE")
                 sck.close()
                 return client.RC.USER_ERROR
-            elif response == "2":
+            elif response == 2:
                 print("c> REGISTER FAIL")
             else:
                 print("UNKNOWN RESPONSE FROM SERVER: ", response)
         except Exception as e:
-            print("c> REGISTER FAIL")
+            print("c> REGISTER CLIENT ERROR - ", str(e))
 
         sck.close()
         return client.RC.ERROR
@@ -72,21 +74,21 @@ class client:
             sck.sendall(username.encode())
 
             # Una vez enviado el nombre de usuario, se espera la respuesta del servidor
-            response = sck.recv(1).decode()
-            if response == "0":
+            response = int.from_bytes(sck.recv(1), byteorder='big')
+            if response == 0:
                 print("c> UNREGISTER OK")
                 sck.close()
                 return client.RC.OK
-            elif response == "1":
+            elif response == 1:
                 print("c> USER DOES NOT EXIST")
                 sck.close()
                 return client.RC.USER_ERROR
-            elif response == "2":
+            elif response == 2:
                 print("c> UNREGISTER FAIL")
             else:
                 print("c> UNKNOWN RESPONSE FROM SERVER: ", response)
         except Exception as e:
-            print("c> UNREGISTER FAIL")
+            print("c> UNREGISTER CLIENT ERROR - ", str(e))
 
         return client.RC.ERROR
 
@@ -122,34 +124,29 @@ class client:
             listen_port = str(client._listen_port) + "\0"
             sck.sendall(listen_port.encode())
 
-            res = sck.recv(1)
-            if not res:
-                print("c> CONNECT FAIL")
-                sck.close()
-                return client.RC.ERROR
-
-            response = res.decode()
-            if response == "0":
+            response = int.from_bytes(sck.recv(1), byteorder='big')
+            if response == 0:
                 print("c> CONNECT OK")
                 success = True
+                client._users_connected.append(user)
                 sck.close()
                 return client.RC.OK
-            elif response == "1":
+            elif response == 1:
                 print("c> CONNECT FAIL, USER DOES NOT EXIST")
                 sck.close()
                 return client.RC.USER_ERROR
-            elif response == "2":
+            elif response == 2:
                 print("c> USER ALREADY CONNECTED")
                 sck.close()
                 return client.RC.USER_ERROR
-            elif response == "3":
+            elif response == 3:
                 print("c> CONNECT FAIL")
                 sck.close()
                 return client.RC.ERROR
             else:
                 print("c> UNKNOWN RESPONSE FROM SERVER: ", response)
         except Exception as e:
-            print("c> CONNECT FAIL")
+            print("c> CONNECT CLIENT ERROR - ", str(e))
         finally:
             if sck:
                 sck.close()
@@ -158,13 +155,64 @@ class client:
                 client._listen_socket.close()
                 client._listen_socket = None
                 client._listen_port = None
+                client._listen_thread = None
 
         return client.RC.ERROR
 
     @staticmethod
     def disconnect(user):
+        if len(user) < 0 or len(user) > 255:
+            print("Error: Invalid username length")
+            return client.RC.USER_ERROR
 
-        #  Write your code here
+        sck = None
+        try:
+            # Ahora, tenemos primero que mandar el mensaje al servidor. En caso de
+            # que el servidor no esté disponible, no podremos cerrar el socket de escucha
+            sck = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sck.connect((client._server, client._port))
+            sck.sendall("DISCONNECT\0".encode())
+            username = user + "\0"
+            sck.sendall(username.encode())
+
+            # Una vez enviado el nombre de usuario, se espera la respuesta del servidor
+            response = int.from_bytes(sck.recv(1), byteorder='big')
+            if response == 0:
+                sck.close()
+
+                # Si ha salido bien, ahora cerramos el socket de escucha
+                if client._listen_socket:
+                    client._listen_socket.close()
+                    client._listen_socket = None
+                    client._listen_port = None
+
+                # y matamos al hilo
+                if client._listen_thread:
+                    client._listen_thread = None
+
+                client._users_connected.remove(user)
+                print("c> DISCONNECT OK")
+                return client.RC.OK
+            elif response == 1:
+                print("c> DISCONNECT FAIL , USER DOES NOT EXIST")
+                sck.close()
+                return client.RC.USER_ERROR
+            elif response == 2:
+                print("c> DISCONNECT FAIL , USER NOT CONNECTED")
+                sck.close()
+                return client.RC.USER_ERROR
+            elif response == 3:
+                print("c> DISCONNECT FAIL")
+                sck.close()
+                return client.RC.ERROR
+            else:
+                print("c> UNKNOWN RESPONSE FROM SERVER: ", response)
+
+        except Exception as e:
+            print("c> DISCONNECT CLIENT ERROR - ", str(e))
+        finally:
+            if sck:
+                sck.close()
 
         return client.RC.ERROR
 
@@ -208,7 +256,7 @@ class client:
         """
         Hilo que escucha conexiones entrantes de otros clientes.
         """
-        print("[DOWNLOAD THREAD] Hilo de escucha iniciado.")
+        #print("[DOWNLOAD THREAD] Hilo de escucha iniciado.")
         while True:
             try:
                 conn, addr = client._listen_socket.accept()
@@ -217,7 +265,7 @@ class client:
             except Exception as e: # Se produce cuando el socket de escucha se cierra
                 break
 
-        print("[DOWNLOAD THREAD] Socket de escucha cerrado. Saliendo del hilo.")
+        #print("[DOWNLOAD THREAD] Socket de escucha cerrado. Saliendo del hilo.")
 
     # *
 

@@ -26,6 +26,7 @@ user_t *usuarios = NULL;
 void handle_register(int socket, char *user);
 void handle_unregister(int socket, char *user);
 void handle_connect(int socket, char *user);
+void handle_disconnect(int socket, char *user);
 
 void handle_poweroff() {
   close(server_sock);
@@ -37,13 +38,11 @@ void handle_poweroff() {
 /*
  * Función auxiliar para enviar un valor entero al cliente en formato ascii + \0
  */
-int send_ret_value(int socket, int ret) {
-  // Transformamos el valor de retorno en ascii y lo enviamos al cliente
-  char ret_str[16] = {0};
-  snprintf(ret_str, sizeof(ret_str), "%d", ret);
-  ret_str[sizeof(ret_str) - 1] = '\0';
-  ssize_t bytes_sent = send_message(socket, ret_str, sizeof(ret_str));
-  if (bytes_sent == -1) {
+int send_ret_value(int socket, uint8_t ret) {
+  // NO HACE FALTA TRANSFORMAR EL VALOR A FORMATO DE RED PORQUE, AL SER UN ÚNICO BYTE,
+  // NO HAY PROBLEMAS DE ENDIANESS
+  ssize_t bytes_sent = send_message(socket, (char *) &ret, sizeof(ret));
+  if (bytes_sent < 0) {
     return -1;
   }
   return 0;
@@ -52,7 +51,7 @@ int send_ret_value(int socket, int ret) {
 void handle_register(int socket, char *user) {
   // En la operación register, solo hace falta el código de operación y el nombre de usuario
   int res = add_user(&usuarios, user);
-  if (send_ret_value(socket, res) != 0) {
+  if (send_ret_value(socket, (uint8_t) res) != 0) {
     printf("s> error sending return value to %s", user);
   }
 }
@@ -60,7 +59,7 @@ void handle_register(int socket, char *user) {
 void handle_unregister(int socket, char *user) {
   // En la operación unregister, solo hace falta el código de operación y el nombre de usuario
   int res = remove_user(&usuarios, user);
-  if (send_ret_value(socket, res) != 0) {
+  if (send_ret_value(socket, (uint8_t) res) != 0) {
     printf("s> error sending return value to %s", user);
   }
 }
@@ -91,7 +90,15 @@ void handle_connect(int socket, char *user) {
   }
 
   int res = connect_user(&usuarios, user, inet_ntoa(client_addr.sin_addr), port);
-  if (send_ret_value(socket, res) != 0) {
+  if (send_ret_value(socket, (uint8_t) res) != 0) {
+    printf("s> error sending return value to %s", user);
+  }
+}
+
+void handle_disconnect(int socket, char *user) {
+  // En la operación disconnect, solo hace falta el código de operación y el nombre de usuario
+  int res = disconnect_user(&usuarios, user);
+  if (send_ret_value(socket, (uint8_t) res) != 0) {
     printf("s> error sending return value to %s", user);
   }
 }
@@ -138,6 +145,8 @@ void *handle_request(void *arg) {
     handle_unregister(client_sock, user);
   } else if (strcmp(operation, "CONNECT") == 0) {
     handle_connect(client_sock, user);
+  } else if (strcmp(operation, "DISCONNECT") == 0) {
+    handle_disconnect(client_sock, user);
   } else {
     printf("s> unknown operation: %s\n", operation);
   }

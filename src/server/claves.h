@@ -83,9 +83,24 @@ int find_user(user_t *head, const char *name, user_t **out_user);
  * @return int:
  *   - 0 si se ha conectado correctamente.
  *   - 1 si no existe.
- *   - 2 en caso de error (parámetros nulos).
+ *   - 2 en caso de que el usuario ya esté conectado.
+ *   - 3 cualquier otro caso.
  */
 int connect_user(user_t **head, const char *name, const char *ip, int port);
+
+/**
+ * @brief Marca como 'desconectado' a un usuario si existe.
+ *
+ * @param[in] head  Cabeza de la lista de usuarios.
+ * @param[in] name  Nombre del usuario a "desconectar".
+ *
+ * @return int:
+ *   - 0 si se ha desconectado correctamente.
+ *   - 1 si no existe.
+ *   - 2 si el usuario no está conectado.
+ *   - 3 en caso de error (parámetros nulos).
+ */
+int disconnect_user(user_t **head, const char *name);
 
 /**
  * @brief Añade un fichero a la lista del usuario 'username'.

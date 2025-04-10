@@ -14,7 +14,6 @@ typedef struct file file_t;
  */
 struct file {
   char path[256]; /**< Ruta completa del fichero (máx. 255 caracteres) */
-  size_t size; /**< Tamaño del fichero en bytes */
   char description[256]; /**< Descripción asociada al fichero (máx. 255 caracteres) */
   file_t *next; /**< Puntero al siguiente fichero en la lista enlazada */
 };
@@ -114,11 +113,11 @@ int disconnect_user(user_t **head, const char *name);
  * @return int:
  *   - 0 si se añade correctamente.
  *   - 1 si el usuario no existe.
- *   - 2 si el fichero ya estaba publicado por ese usuario.
- *   - 3 si ocurre otro error (parámetros nulos o fallo en malloc).
+ *   - 2 si el usuario no está conectado.
+ *   - 3 si el fichero ya está publicado.
+ *   - 4 si ocurre otro error (parámetros nulos o fallo en malloc).
  */
-int add_file(user_t *head, const char *username,
-             const char *path, size_t size, const char *description);
+int add_file(user_t **head, const char *username, const char *path, const char *description);
 
 /**
  * @brief Elimina un fichero 'path' de la lista del usuario 'username'.

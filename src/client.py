@@ -2,6 +2,7 @@ from enum import Enum
 import threading
 import argparse
 import socket
+import os
 
 
 class client:
@@ -23,10 +24,11 @@ class client:
     _listen_port = None
     _listen_socket = None
     _users_connected = []
+    _current_user_connected = None
     # ******************** METHODS *******************
 
     @staticmethod
-    def register(user: str):
+    def register(user):
         if len(user) < 0 or len(user) > 255:
             print("Error: Invalid username length")
             return client.RC.USER_ERROR
@@ -76,6 +78,10 @@ class client:
             # Una vez enviado el nombre de usuario, se espera la respuesta del servidor
             response = int.from_bytes(sck.recv(1), byteorder='big')
             if response == 0:
+                if user in client._users_connected:
+                    client._users_connected.remove(user)
+                if user == client._current_user_connected:
+                    client._current_user_connected = None
                 print("c> UNREGISTER OK")
                 sck.close()
                 return client.RC.OK
@@ -129,6 +135,7 @@ class client:
                 print("c> CONNECT OK")
                 success = True
                 client._users_connected.append(user)
+                client._current_user_connected = user
                 sck.close()
                 return client.RC.OK
             elif response == 1:
@@ -191,6 +198,7 @@ class client:
                     client._listen_thread = None
 
                 client._users_connected.remove(user)
+                client._current_user_connected = None
                 print("c> DISCONNECT OK")
                 return client.RC.OK
             elif response == 1:
@@ -218,8 +226,78 @@ class client:
 
     @staticmethod
     def publish(fileName, description):
+        if len(fileName) < 0 or len(fileName) > 255:
+            print("Error: Invalid filename length")
+            return client.RC.USER_ERROR
 
-        #  Write your code here
+        # Comprobamos que el path no tenga espacios en blanco
+        if " " in fileName:
+            print("Error: Invalid filename, blank spaces not allowed")
+            return client.RC.USER_ERROR
+
+        # Comprobamos que el fichero exista
+        if not os.path.isfile(fileName):
+            print("Error: File does not exist")
+            return client.RC.USER_ERROR
+
+        # Verificamos que el path sea absoluto y en caso de que no lo sea, lo convertimos
+        if not os.path.isabs(fileName):
+            fileName = os.path.abspath(fileName)
+            if len(fileName) < 0 or len(fileName) > 255:
+                print("Error: Invalid filename length while converting to absolute path")
+                return client.RC.USER_ERROR
+
+        if len(description) < 0 or len(description) > 255:
+            print("Error: Invalid description length")
+            return client.RC.USER_ERROR
+
+        if client._current_user_connected is None:
+            print("Error: No user is connected")
+            return client.RC.USER_ERROR
+
+        sck = None
+        try:
+            sck = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sck.connect((client._server, client._port))
+            sck.sendall("PUBLISH\0".encode())
+            username = client._current_user_connected + "\0"
+            sck.sendall(username.encode())
+
+            # Ahora enviamos el path
+            fileName = fileName + "\0"
+            sck.sendall(fileName.encode())
+            # Y ahora la descripción
+            description = description + "\0"
+            sck.sendall(description.encode())
+
+            response = int.from_bytes(sck.recv(1), byteorder='big')
+            if response == 0:
+                print("c> PUBLISH OK")
+                sck.close()
+                return client.RC.OK
+            elif response == 1:
+                print("c> PUBLISH FAIL, USER DOES NOT EXIST")
+                sck.close()
+                return client.RC.USER_ERROR
+            elif response == 2:
+                print("c> PUBLISH FAIL, USER NOT CONNECTED")
+                sck.close()
+                return client.RC.USER_ERROR
+            elif response == 3:
+                print("c> PUBLISH FAIL, CONTENT ALREADY PUBLISHED")
+                sck.close()
+                return client.RC.USER_ERROR
+            elif response == 4:
+                print("c> PUBLISH FAIL")
+                sck.close()
+                return client.RC.USER_ERROR
+            else:
+                print("c> UNKNOWN RESPONSE FROM SERVER: ", response)
+        except Exception as e:
+            print("c> PUBLISH CLIENT ERROR - ", str(e))
+        finally:
+            if sck:
+                sck.close()
 
         return client.RC.ERROR
 

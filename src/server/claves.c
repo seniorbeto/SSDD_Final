@@ -144,39 +144,43 @@ int disconnect_user(user_t **head, const char *name) {
 
 }
 
-int add_file(user_t *head, const char *username, const char *path, size_t size, const char *description) {
+int add_file(user_t **head, const char *username, const char *path, const char *description) {
   if (!head || !username || !path || !description) {
-    return 3;
+    return 4;
   }
 
-  // 1) Buscar al usuario
+  // Buscar al usuario
   user_t *usr = NULL;
-  int ret_user = find_user(head, username, &usr);
+  int ret_user = find_user(*head, username, &usr);
   if (ret_user != 0 || !usr) {
     return 1; // no existe
   }
 
-  // 2) Comprobar si ya existe ese fichero
+  // Comprobar si el usuario está conectado
+  if (!usr->connected) {
+    return 2; // no está conectado
+  }
+
+  // Comprobar si ya existe ese fichero
   file_t *temp = usr->files;
   while (temp) {
     if (strcmp(temp->path, path) == 0) {
-      return 2; // Fichero ya publicado
+      return 3; // Fichero ya publicado
     }
     temp = temp->next;
   }
 
-  // 3) Crear el nuevo file
+  // Crear el nuevo file
   file_t *new_file = (file_t *) malloc(sizeof(file_t));
   if (!new_file) {
-    return 3; // Error de memoria
+    return 4; // Error de memoria
   }
   memset(new_file, 0, sizeof(file_t));
   strncpy(new_file->path, path, sizeof(new_file->path) - 1);
   strncpy(new_file->description, description, sizeof(new_file->description) - 1);
-  new_file->size = size;
   new_file->next = usr->files;
 
-  // 4) Enlazar
+  // Enlazar
   usr->files = new_file;
   return 0; // Éxito
 }

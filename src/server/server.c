@@ -13,6 +13,8 @@
 #define MAX_MSG_SIZE 2048
 #define MAX_OP_MSG_SIZE 64
 #define MAX_USER_MSG_SIZE 255
+#define MAX_FILE_PATH_SIZE 256
+#define MAX_FILE_DESC_SIZE 256
 
 pthread_mutex_t req_lock = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t req_cond = PTHREAD_COND_INITIALIZER;
@@ -27,6 +29,7 @@ void handle_register(int socket, char *user);
 void handle_unregister(int socket, char *user);
 void handle_connect(int socket, char *user);
 void handle_disconnect(int socket, char *user);
+void handle_publish(int socket, char *user);
 
 void handle_poweroff() {
   close(server_sock);
@@ -103,6 +106,33 @@ void handle_disconnect(int socket, char *user) {
   }
 }
 
+void handle_publish(int socket, char *user) {
+  // Aquí, todavía nos falta por llegar la ruta del fichero y su descripcción,
+  // ambos valores como más de 256 caracteres
+  char file_path[MAX_FILE_PATH_SIZE] = {0};
+  ssize_t bytes_read = read_line(socket, file_path, sizeof(file_path));
+  file_path[sizeof(file_path) - 1] = '\0'; // Por si acaso
+  if (bytes_read <= 0) {
+    perror("s> error reading file path");
+    close(socket);
+    return;
+  }
+
+  char file_desc[MAX_FILE_DESC_SIZE] = {0};
+  bytes_read = read_line(socket, file_desc, sizeof(file_desc));
+  file_desc[sizeof(file_desc) - 1] = '\0'; // Por si acaso
+  if (bytes_read <= 0) {
+    perror("s> error reading file description");
+    close(socket);
+    return;
+  }
+
+  int res = add_file(&usuarios, user, file_path, file_desc);
+  if (send_ret_value(socket, (uint8_t) res) != 0) {
+    printf("s> error sending return value to %s", user);
+  }
+}
+
 void *handle_request(void *arg) {
   int client_sock;
 
@@ -147,6 +177,8 @@ void *handle_request(void *arg) {
     handle_connect(client_sock, user);
   } else if (strcmp(operation, "DISCONNECT") == 0) {
     handle_disconnect(client_sock, user);
+  } else if (strcmp(operation, "PUBLISH") == 0) {
+    handle_publish(client_sock, user);
   } else {
     printf("s> unknown operation: %s\n", operation);
   }

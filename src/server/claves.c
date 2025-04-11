@@ -285,12 +285,6 @@ int get_connected_users(user_t **head, const char *username, connected_user_t **
 
   pthread_rwlock_rdlock(&lock);
 
-  // Si no hay usuarios conectados, devolvemos un código de error 3
-  if (users_connected <= 0) {
-    pthread_rwlock_unlock(&lock);
-    return 3; // No hay usuarios conectados
-  }
-
   user_t *usr = NULL;
   int ret_user = find_user_internal(*head, username, &usr);
   if (ret_user != 0 || !usr) {
@@ -330,6 +324,63 @@ int get_connected_users(user_t **head, const char *username, connected_user_t **
   }
   pthread_rwlock_unlock(&lock);
 
+  return 0; // Éxito
+}
+
+int get_user_files(user_t **head, const char *username, const char *usertocheck, file_t **array, uint32_t *size) {
+  if (!head || !username || !usertocheck || !array) {
+    return 4;
+  }
+
+  pthread_rwlock_rdlock(&lock);
+
+  // comprobacmos que el usuario que solicita la lista de ficheros existe
+  user_t *usr = NULL;
+  int ret_user = find_user_internal(*head, username, &usr);
+  if (ret_user != 0 || !usr) {
+    pthread_rwlock_unlock(&lock);
+    return 1; // No existe
+  }
+
+  // comprobamos que el usuario que solicita la lista de ficheros está conectado
+  if (!usr->connected) {
+    pthread_rwlock_unlock(&lock);
+    return 2; // No conectado
+  }
+
+  // comprobamos que el usuario del que se quieren obtener los ficheros existe
+  user_t *usr_to_check = NULL;
+  int ret_user_to_check = find_user_internal(*head, usertocheck, &usr_to_check);
+  if (ret_user_to_check != 0 || !usr_to_check) {
+    pthread_rwlock_unlock(&lock);
+    return 3; // No existe
+  }
+
+  // Como todo ha salido bien, reservamos memoria para el array
+  // en función de la cantidad de ficheros que haya publicado el usuario
+  // OJO: LIBERAR ESTA MEMORIA ES RESPONSABILIDAD DEL CALLER
+  uint32_t count = 0;
+  file_t *temp = usr_to_check->files;
+  while (temp) {
+    count++;
+    temp = temp->next;
+  }
+
+  // Ahora ya podemos reservar memoria
+  *array = (file_t *) malloc(count * sizeof(file_t));
+  if (!*array) {
+    pthread_rwlock_unlock(&lock);
+    return 4; // Error de memoria
+  }
+  *size = count;
+
+  int i = 0;
+  for (file_t *f = usr_to_check->files; f; f = f->next, i++) {
+    strncpy((*array)[i].path, f->path, sizeof((*array)[i].path));
+    (*array)[i].path[sizeof((*array)[i].path) - 1] = '\0';
+  }
+
+  pthread_rwlock_unlock(&lock);
   return 0; // Éxito
 }
 

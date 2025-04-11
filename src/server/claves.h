@@ -2,8 +2,8 @@
 #define CLAVES_H
 
 #include <stdbool.h>
-#include <stdint.h>
 #include <stddef.h>
+#include <stdint.h>
 
 // CABECERAS
 typedef struct user user_t;
@@ -179,6 +179,26 @@ int find_file(user_t *head, const char *username, const char *path, file_t **out
  *   - 3 en cualquier otro caso (parámetros nulos o fallo en malloc).
  */
 int get_connected_users(user_t **head, const char *username, connected_user_t **array, uint32_t *size);
+
+/**
+ * @brief Devuelve un array de ficheros publicados por el usuario 'username'.
+ * OJO: la responsabilidad de liberar la memoria del array es del caller, ya que
+ * esta función reserva memoria en función del número de ficheros publicados.
+ *
+ * @param[in]  head       Cabeza de la lista de usuarios.
+ * @param[in]  username   Nombre del usuario que solicita la lista.
+ * @param[in]  usertocheck Nombre del usuario cuyos ficheros se quieren obtener.
+ * @param[out] array      Array donde se almacenarán los ficheros publicados.
+ * @param[out] size       Tamaño del array (número de ficheros publicados).
+ *
+ * @return int:
+ *   - 0 si se obtiene correctamente el array.
+ *   - 1 si el usuario no existe.
+ *   - 2 si el usuario que realiza la operación no está conectado.
+ *   - 3 si el usuario del que se quieren obtener los ficheros no existe.
+ *   - 4 en cualquier otro caso (parámetros nulos o fallo en malloc).
+ */
+int get_user_files(user_t **head, const char *username, const char *usertocheck, file_t **array, uint32_t *size);
 
 /**
  * @brief Libera toda la memoria asociada a la lista de usuarios y sus ficheros.

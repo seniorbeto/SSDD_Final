@@ -32,6 +32,7 @@ void handle_disconnect(int socket, char *user);
 void handle_publish(int socket, char *user);
 void handle_delete(int socket, char *user);
 void handle_list_users(int socket, char *user);
+void handle_list_files(int socket, char *user);
 
 void handle_poweroff() {
   close(server_sock);
@@ -193,9 +194,47 @@ void handle_list_users(int socket, char *user) {
         return;
       }
     }
-
-    free(conn_users);
   }
+  free(conn_users);
+}
+
+void handle_list_files(int socket, char *user) {
+  char other[MAX_USER_MSG_SIZE];
+  memset(other, 0, MAX_USER_MSG_SIZE);
+  ssize_t bytes_read = read_line(socket, other, sizeof(other));
+  other[sizeof(other) - 1] = '\0';
+  if (bytes_read <= 0) {
+    perror("s> error reading other user");
+    close(socket);
+    return;
+  }
+
+  file_t *files = NULL;
+  uint32_t num_files = 0;
+  int res = get_user_files(&usuarios, user, other, &files, &num_files);
+  if (send_ret_value(socket, (uint8_t) res) != 0) {
+    printf("s> error sending return value to %s\n", user);
+    return;
+  }
+
+  if (res == 0) {
+    char buffer[32] = {0};
+    snprintf(buffer, sizeof(buffer), "%u", num_files);
+    size_t len = strlen(buffer) + 1;
+    if (send_message(socket, buffer, len) != 0) {
+      free(files);
+      return;
+    }
+
+    for (uint32_t i = 0; i < num_files; i++) {
+      len = strnlen(files[i].path, sizeof(files[i].path)) + 1;
+      if (send_message(socket, files[i].path, len) != 0) {
+        free(files);
+        return;
+      }
+    }
+  }
+  free(files);
 }
 
 void *handle_request(void *arg) {
@@ -248,6 +287,8 @@ void *handle_request(void *arg) {
     handle_delete(client_sock, user);
   } else if (strcmp(operation, "LIST_USERS") == 0) {
     handle_list_users(client_sock, user);
+  } else if (strcmp(operation, "LIST_CONTENT") == 0) {
+    handle_list_files(client_sock, user);
   } else {
     printf("s> unknown operation: %s\n", operation);
   }

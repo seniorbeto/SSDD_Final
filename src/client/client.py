@@ -439,8 +439,75 @@ class client:
 
     @staticmethod
     def listcontent(user):
+        if len(user) < 0 or len(user) > 255:
+            print("Error: Invalid username length")
+            return client.RC.USER_ERROR
 
-        #  Write your code here
+        if client._current_user_connected is None:
+            print("c> LIST_CONTENT FAIL, USER NOT CONNECTED")
+            return client.RC.USER_ERROR
+
+        sck = None
+        try:
+            sck = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sck.connect((client._server, client._port))
+            sck.sendall("LIST_CONTENT\0".encode())
+            username = client._current_user_connected + "\0"
+            sck.sendall(username.encode())
+
+            # Enviamos el nombre de usuario del que queremos listar el contenido
+            username = user + "\0"
+            sck.sendall(username.encode())
+
+            response = int.from_bytes(sck.recv(1), byteorder='big')
+            if response == 0:
+                # Éxito
+                print("c> LIST_CONTENT OK")
+
+                num_files_str = recv_cstring(sck)
+                try:
+                    num_files = int(num_files_str)
+                except ValueError:
+                    print("c> LIST_CONTENT CLIENT ERROR - invalid num_files: ", num_files_str)
+                    return client.RC.ERROR
+
+                # Leemos los datos de cada fichero: name, description (2 C-strings por fichero)
+                files = []
+                for _ in range(num_files):
+                    filename = recv_cstring(sck)
+                    files.append(filename)
+
+                max_file_len = max(len(f[0]) for f in files) if files else 0
+
+                for i, filename in enumerate(files):
+                    print(f"\tFILE{i}: {filename.ljust(max_file_len)}")
+                return client.RC.OK
+
+            elif response == 1:
+                print("c> LIST_CONTENT FAIL, USER DOES NOT EXIST")
+                return client.RC.USER_ERROR
+
+            elif response == 2:
+                print("c> LIST_CONTENT FAIL, USER NOT CONNECTED")
+                return client.RC.USER_ERROR
+
+            elif response == 3:
+                print("c> LIST_CONTENT FAIL, REMOTE USER DOES NOT EXIST")
+                return client.RC.USER_ERROR
+
+            elif response == 4:
+                print("c> LIST_CONTENT FAIL")
+                return client.RC.USER_ERROR
+
+            else:
+                print("c> UNKNOWN RESPONSE FROM SERVER:", response)
+                return client.RC.ERROR
+
+        except Exception as e:
+            print("c> LIST_CONTENT CLIENT ERROR -", str(e))
+        finally:
+            if sck:
+                sck.close()
 
         return client.RC.ERROR
 

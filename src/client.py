@@ -373,8 +373,48 @@ class client:
 
     @staticmethod
     def listusers():
+        if client._current_user_connected is None:
+            print("c> LIST_USERS FAIL, USER NOT CONNECTED")
+            return client.RC.USER_ERROR
 
-        #  Write your code here
+        sck = None
+        try:
+            sck = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sck.connect((client._server, client._port))
+            sck.sendall("DELETE\0".encode())
+            username = client._current_user_connected + "\0"
+            sck.sendall(username.encode())
+
+            # Una vez enviado el nombre de usuario, se espera la respuesta del servidor
+            response = int.from_bytes(sck.recv(1), byteorder='big')
+            if response == 0:
+                print("c> LIST_USERS OK")
+                # Recibimos el número de usuarios conectados
+                num_users = int.from_bytes(sck.recv(1), byteorder='big')
+                for i in range(num_users):
+                    user = sck.recv(255).decode().rstrip('\0')
+                    print(f"\tUSER{i}: {user}")
+                sck.close()
+                return client.RC.OK
+            elif response == 1:
+                print("c> LIST_USERS FAIL, USER DOES NOT EXIST")
+                sck.close()
+                return client.RC.USER_ERROR
+            elif response == 2:
+                print("c> LIST_USERS FAIL, USER NOT CONNECTED")
+                sck.close()
+                return client.RC.USER_ERROR
+            elif response == 3:
+                print("c> LIST_USERS FAIL")
+                sck.close()
+                return client.RC.USER_ERROR
+            else:
+                print("c> UNKNOWN RESPONSE FROM SERVER: ", response)
+        except Exception as e:
+            print("c> LIST_USERS CLIENT ERROR - ", str(e))
+        finally:
+            if sck:
+                sck.close()
 
         return client.RC.ERROR
 

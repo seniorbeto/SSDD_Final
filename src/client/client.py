@@ -398,13 +398,18 @@ class client:
                     return client.RC.ERROR
 
                 # Leemos los datos de cada usuario: name, ip, port (3 C-strings por usuario)
-                for i in range(num_users):
+                users = []
+                for _ in range(num_users):
                     username = recv_cstring(sck)
                     ip_str = recv_cstring(sck)
                     port = recv_cstring(sck)
+                    users.append((username, ip_str, port))
 
-                    print(f"\tUSER{i}: {username}\t\t{ip_str}\t{port}")
+                max_user_len = max(len(u[0]) for u in users) if users else 0
+                max_ip_len = max(len(u[1]) for u in users) if users else 0
 
+                for i, (username, ip_str, port) in enumerate(users):
+                    print(f"\tUSER{i}: {username.ljust(max_user_len)}\t{ip_str.ljust(max_ip_len)}\t{port}")
                 return client.RC.OK
 
             elif response == 1:
@@ -478,134 +483,77 @@ class client:
                 command = input("c> ")
 
                 line = command.split(" ")
-
                 if (len(line) > 0):
-
                     line[0] = line[0].upper()
                     if (line[0] == "REGISTER"):
-
                         if (len(line) == 2):
-
                             client.register(line[1])
-
                         else:
-
                             print("Syntax error. Usage: REGISTER <userName>")
 
-
-
                     elif (line[0] == "UNREGISTER"):
-
                         if (len(line) == 2):
-
                             client.unregister(line[1])
-
                         else:
-
                             print("Syntax error. Usage: UNREGISTER <userName>")
 
-
-
                     elif (line[0] == "CONNECT"):
-
                         if (len(line) == 2):
-
                             client.connect(line[1])
-
                         else:
-
                             print("Syntax error. Usage: CONNECT <userName>")
 
-
-
                     elif (line[0] == "PUBLISH"):
-
                         if (len(line) >= 3):
-
                             #  Remove first two words
-
                             description = ' '.join(line[2:])
-
                             client.publish(line[1], description)
-
                         else:
-
                             print("Syntax error. Usage: PUBLISH <fileName> <description>")
 
 
-
                     elif (line[0] == "DELETE"):
-
                         if (len(line) == 2):
-
                             client.delete(line[1])
-
                         else:
-
                             print("Syntax error. Usage: DELETE <fileName>")
 
-
-
                     elif (line[0] == "LIST_USERS"):
-
                         if (len(line) == 1):
-
                             client.listusers()
-
                         else:
-
                             print("Syntax error. Use: LIST_USERS")
 
-
-
                     elif (line[0] == "LIST_CONTENT"):
-
                         if (len(line) == 2):
-
                             client.listcontent(line[1])
-
                         else:
-
                             print("Syntax error. Usage: LIST_CONTENT <userName>")
 
 
 
                     elif (line[0] == "DISCONNECT"):
-
                         if (len(line) == 2):
-
                             client.disconnect(line[1])
-
                         else:
-
                             print("Syntax error. Usage: DISCONNECT <userName>")
 
 
 
                     elif (line[0] == "GET_FILE"):
-
                         if (len(line) == 4):
-
                             client.getfile(line[1], line[2], line[3])
-
                         else:
-
                             print("Syntax error. Usage: GET_FILE <userName> <remote_fileName> <local_fileName>")
 
 
 
                     elif (line[0] == "QUIT"):
-
                         if (len(line) == 1):
-
                             break
-
                         else:
-
                             print("Syntax error. Use: QUIT")
-
                     else:
-
                         print("Error: command " + line[0] + " not valid.")
 
             except Exception as e:

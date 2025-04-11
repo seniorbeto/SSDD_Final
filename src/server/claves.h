@@ -24,7 +24,7 @@ struct file {
  * @brief Estructura que representa un usuario del sistema.
  */
 struct user {
-  char name[32]; /**< Nombre del usuario (máx. 31 caracteres) */
+  char name[255]; /**< Nombre del usuario (máx. 31 caracteres) */
   char ip[16]; /**< Dirección IP del usuario (máx. 15 caracteres) */
   int port; /**< Puerto asociado al usuario */
   bool connected; /**< Indica si el usuario está conectado o no */
@@ -38,7 +38,7 @@ struct user {
  */
 typedef struct connected_user_s {
   char name[256];
-  char ip[16];
+  char ip[17];
   int port;
 } connected_user_t;
 

@@ -31,6 +31,7 @@ void handle_connect(int socket, char *user);
 void handle_disconnect(int socket, char *user);
 void handle_publish(int socket, char *user);
 void handle_delete(int socket, char *user);
+void handle_list_users(int socket, char *user);
 
 void handle_poweroff() {
   close(server_sock);
@@ -150,6 +151,53 @@ void handle_delete(int socket, char *user) {
   }
 }
 
+void handle_list_users(int socket, char *user) {
+  connected_user_t *conn_users = NULL;
+  uint32_t num_users = 0;
+
+  int res = get_connected_users(&usuarios, user, &conn_users, &num_users);
+  if (send_ret_value(socket, (uint8_t) res) != 0) {
+    printf("s> error sending return value to %s\n", user);
+    return;
+  }
+
+  if (res == 0) {
+    char buffer[32] = {0};
+    snprintf(buffer, sizeof(buffer), "%u", num_users);
+    /*
+     * Es importante especificar el tamaño del buffer, ya que el buffer es más
+     * grande que el tamaño del mensaje a enviar. Si no se especifica el tamaño,
+     * el mensaje se enviará completo, incluyendo toda la basura residua en el buffer.
+     */
+    size_t len = strlen(buffer) + 1;
+    if (send_message(socket, buffer, len) != 0) {
+      free(conn_users);
+      return;
+    }
+
+    for (uint32_t i = 0; i < num_users; i++) {
+      len = strnlen(conn_users[i].name, sizeof(conn_users[i].name)) + 1;
+      if (send_message(socket, conn_users[i].name, len) != 0) {
+        free(conn_users);
+        return;
+      }
+      len = strnlen(conn_users[i].ip, sizeof(conn_users[i].ip)) + 1;
+      if (send_message(socket, conn_users[i].ip, len) != 0) {
+        free(conn_users);
+        return;
+      }
+      snprintf(buffer, sizeof(buffer), "%u", conn_users[i].port);
+      len = strlen(buffer) + 1;
+      if (send_message(socket, buffer, len) != 0) {
+        free(conn_users);
+        return;
+      }
+    }
+
+    free(conn_users);
+  }
+}
+
 void *handle_request(void *arg) {
   int client_sock;
 
@@ -198,6 +246,8 @@ void *handle_request(void *arg) {
     handle_publish(client_sock, user);
   } else if (strcmp(operation, "DELETE") == 0) {
     handle_delete(client_sock, user);
+  } else if (strcmp(operation, "LIST_USERS") == 0) {
+    handle_list_users(client_sock, user);
   } else {
     printf("s> unknown operation: %s\n", operation);
   }

@@ -1,8 +1,13 @@
-from enum import Enum
 import threading
 import argparse
 import socket
+import signal
 import os
+import io
+from contextlib import redirect_stdout
+from enum import Enum
+
+from netools import recv_cstring
 
 
 class client:
@@ -23,7 +28,6 @@ class client:
     _listen_thread = None
     _listen_port = None
     _listen_socket = None
-    _users_connected = []
     _current_user_connected = None
     # ******************** METHODS *******************
 
@@ -78,8 +82,6 @@ class client:
             # Una vez enviado el nombre de usuario, se espera la respuesta del servidor
             response = int.from_bytes(sck.recv(1), byteorder='big')
             if response == 0:
-                if user in client._users_connected:
-                    client._users_connected.remove(user)
                 if user == client._current_user_connected:
                     client._current_user_connected = None
                 print("c> UNREGISTER OK")
@@ -134,7 +136,6 @@ class client:
             if response == 0:
                 print("c> CONNECT OK")
                 success = True
-                client._users_connected.append(user)
                 client._current_user_connected = user
                 sck.close()
                 return client.RC.OK
@@ -197,7 +198,6 @@ class client:
                 if client._listen_thread:
                     client._listen_thread = None
 
-                client._users_connected.remove(user)
                 client._current_user_connected = None
                 print("c> DISCONNECT OK")
                 return client.RC.OK
@@ -381,37 +381,51 @@ class client:
         try:
             sck = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             sck.connect((client._server, client._port))
-            sck.sendall("DELETE\0".encode())
+            sck.sendall("LIST_USERS\0".encode())
             username = client._current_user_connected + "\0"
             sck.sendall(username.encode())
 
-            # Una vez enviado el nombre de usuario, se espera la respuesta del servidor
             response = int.from_bytes(sck.recv(1), byteorder='big')
             if response == 0:
+                # Éxito
                 print("c> LIST_USERS OK")
-                # Recibimos el número de usuarios conectados
-                num_users = int.from_bytes(sck.recv(1), byteorder='big')
+
+                num_users_str = recv_cstring(sck)
+                try:
+                    num_users = int(num_users_str)
+                except ValueError:
+                    print("c> LIST_USERS CLIENT ERROR - invalid num_users: ", num_users_str)
+                    return client.RC.ERROR
+
+                # Leemos los datos de cada usuario: name, ip, port (3 C-strings por usuario)
                 for i in range(num_users):
-                    user = sck.recv(255).decode().rstrip('\0')
-                    print(f"\tUSER{i}: {user}")
-                sck.close()
+                    username = recv_cstring(sck)
+                    ip_str = recv_cstring(sck)
+                    port = recv_cstring(sck)
+
+                    print(f"\tUSER{i}: {username}\t\t{ip_str}\t{port}")
+
                 return client.RC.OK
+
             elif response == 1:
                 print("c> LIST_USERS FAIL, USER DOES NOT EXIST")
-                sck.close()
                 return client.RC.USER_ERROR
+
             elif response == 2:
                 print("c> LIST_USERS FAIL, USER NOT CONNECTED")
-                sck.close()
                 return client.RC.USER_ERROR
+
             elif response == 3:
                 print("c> LIST_USERS FAIL")
-                sck.close()
                 return client.RC.USER_ERROR
+
             else:
-                print("c> UNKNOWN RESPONSE FROM SERVER: ", response)
+                print("c> UNKNOWN RESPONSE FROM SERVER:", response)
+                return client.RC.ERROR
+
         except Exception as e:
-            print("c> LIST_USERS CLIENT ERROR - ", str(e))
+            print("c> LIST_USERS CLIENT ERROR -", str(e))
+            return client.RC.ERROR
         finally:
             if sck:
                 sck.close()
@@ -638,6 +652,22 @@ class client:
 
         return True
 
+    @staticmethod
+    def handle_exit_signal(signum, frame):
+        # Si el cliente estaba conectado y no se ha desconectado, lo hacemos
+        # pero capturando la salida estándar para que no se vea en la consola
+        if client._current_user_connected is not None:
+            with io.StringIO() as buf, redirect_stdout(buf):
+                client.disconnect(client._current_user_connected)
+                output = buf.getvalue()
+                if output:
+                    print(output)
+                else:
+                    print("No output from disconnect command")
+        print()
+        print("+++ FINISHED +++")
+        exit(0)
+
     # ******************** MAIN *********************
 
     @staticmethod
@@ -648,11 +678,12 @@ class client:
 
             return
 
-        #  Write code here
+        signal.signal(signal.SIGINT, client.handle_exit_signal)
+        signal.signal(signal.SIGTERM, client.handle_exit_signal)
 
         client.shell()
+        client.handle_exit_signal(None, None)
 
-        print("+++ FINISHED +++")
 
 
 if __name__ == "__main__":

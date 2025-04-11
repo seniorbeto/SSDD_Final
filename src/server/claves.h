@@ -2,6 +2,7 @@
 #define CLAVES_H
 
 #include <stdbool.h>
+#include <stdint.h>
 #include <stddef.h>
 
 // CABECERAS
@@ -30,6 +31,16 @@ struct user {
   file_t *files; /**< Lista de ficheros publicados por el usuario */
   user_t *next; /**< Puntero al siguiente usuario en la lista enlazada */
 };
+
+/*
+ * La siguiente estructura es lo que se devuelve cuando se ejecuta la función
+ * get_connected_users, que devuelve una lista de usuarios conectados.
+ */
+typedef struct connected_user_s {
+  char name[256];
+  char ip[16];
+  int port;
+} connected_user_t;
 
 /**
  * @brief Añade un nuevo usuario a la lista.
@@ -150,6 +161,24 @@ int remove_file(user_t **head, const char *username, const char *path);
  *   - 3 en caso de error (parámetros nulos).
  */
 int find_file(user_t *head, const char *username, const char *path, file_t **out_file);
+
+/**
+ * @brief Devuelve un array de usuarios conectados. OJO: la responsabilidad
+ * de liberar la memoria del array es del caller, ya que esta función reserva memoria
+ * en función del número de usuarios conectados.
+ *
+ * @param[in]  head       Cabeza de la lista de usuarios.
+ * @param[in]  username   Nombre del usuario que solicita la lista.
+ * @param[out] array      Array donde se almacenarán los usuarios conectados.
+ * @param[out] size       Tamaño del array (número de usuarios conectados).
+ *
+ * @return int:
+ *   - 0 si se obtiene correctamente el array.
+ *   - 1 si el usuario no está registrado.
+ *   - 2 si el usuario no está conectado.
+ *   - 3 en cualquier otro caso (parámetros nulos o fallo en malloc).
+ */
+int get_connected_users(user_t **head, const char *username, connected_user_t **array, uint32_t *size);
 
 /**
  * @brief Libera toda la memoria asociada a la lista de usuarios y sus ficheros.

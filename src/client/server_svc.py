@@ -107,7 +107,7 @@ class ServerThread(threading.Thread):
             return
 
         # Verificamos que la operación sea "GET_FILE"
-        if operation != "GET_FILE":
+        if operation != "GET_FILE" or operation != "GET_MULTIFILE":
             client.send(b'\x02')
             client.close()
             logging.warning("Operación no válida recibida. Se cierra la conexión.")
@@ -121,19 +121,21 @@ class ServerThread(threading.Thread):
             return
 
         # Si el fichero existe, lo enviamos al cliente
-        client.send(b'\x00')
-        try:
-            with open(file_path, 'rb') as f:
-                while True:
-                    data = f.read(1)
-                    if not data:
-                        break
-                    client.send(data)
-            logging.info(f"Archivo enviado correctamente: {file_path}")
-        except Exception as e:
-            client.send(b'\x02')
-            logging.exception("Error durante el envío del archivo:")
-        finally:
-            client.close()
-            logging.info("Conexión cerrada tras manejo de solicitud.")
+        if operation == "GET_FILE":
+            client.send(b'\x00')
+            try:
+                with open(file_path, 'rb') as f:
+                    while True:
+                        data = f.read(1)
+                        if not data:
+                            break
+                        client.send(data)
+                logging.info(f"Archivo enviado correctamente: {file_path}")
+            except Exception as e:
+                client.send(b'\x02')
+                logging.exception("Error durante el envío del archivo:")
+            finally:
+                client.close()
+                logging.info("Conexión cerrada tras manejo de solicitud.")
 
+        elif operation == "GET_MULTIFILE": ...

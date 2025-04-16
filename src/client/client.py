@@ -563,20 +563,54 @@ class client:
         return client.RC.ERROR
 
     @staticmethod
-    def _downloads_handler():
-        """
-        Hilo que escucha conexiones entrantes de otros clientes.
-        """
-        #print("[DOWNLOAD THREAD] Hilo de escucha iniciado.")
-        while True:
-            try:
-                conn, addr = client._listen_socket.accept()
-                print(f"[DOWNLOAD THREAD] Conexión entrante de {addr}")
-                conn.close()
-            except Exception as e: # Se produce cuando el socket de escucha se cierra
-                break
+    def getmultifile(remote_FileName, local_FileName):
+        if client._current_user_connected is None:
+            print("c> GET_MULTIFILE FAIL, USER NOT CONNECTED")
+            return client.RC.USER_ERROR
 
-        #print("[DOWNLOAD THREAD] Socket de escucha cerrado. Saliendo del hilo.")
+        sck = None
+        try:
+            sck = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sck.connect((client._server, client._port))
+            sck.sendall("GET_MULTIFILE\0".encode())
+            username = client._current_user_connected + "\0"
+            sck.sendall(username.encode())
+
+            # Ahora enviamos el path
+            remote_FileName = remote_FileName + "\0"
+            sck.sendall(remote_FileName.encode())
+
+            response = int.from_bytes(sck.recv(1), byteorder='big')
+            if response == 0:
+                # Éxito
+                print("c> GET_MULTIFILE OK")
+
+                # Ahora, recibimos el fichero
+                with open(local_FileName, 'wb') as f:
+                    while True:
+                        data = sck.recv(1)
+                        if not data:
+                            break
+                        f.write(data)
+                sck.close()
+                return client.RC.OK
+            elif response == 1:
+                print("c> GET_MULTIFILE FAIL, NO USER CONNECTED HAVE FILE")
+                sck.close()
+                return client.RC.USER_ERROR
+            elif response == 2:
+                print("c> GET_MULTIFILE FAIL")
+                sck.close()
+                return client.RC.USER_ERROR
+            else:
+                print("c> UNKNOWN RESPONSE FROM SERVER:", response)
+        except Exception as e:
+            print("c> GET_MULTIFILE CLIENT ERROR -", str(e))
+        finally:
+            if sck:
+                sck.close()
+
+        return client.RC.ERROR
 
     # *
 
@@ -657,7 +691,11 @@ class client:
                         else:
                             print("Syntax error. Usage: GET_FILE <userName> <remote_fileName> <local_fileName>")
 
-
+                    elif (line[0] == "GET_MULTIFILE"):
+                        if (len(line) == 4):
+                            client.getmultifile(line[1], line[2])
+                        else:
+                            print("Syntax error. Usage: GET_MULTIFILE <remote_fileName> <local_fileName>")
 
                     elif (line[0] == "QUIT"):
                         if (len(line) == 1):

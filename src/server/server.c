@@ -33,6 +33,8 @@ void handle_publish(int socket, char *user);
 void handle_delete(int socket, char *user);
 void handle_list_users(int socket, char *user);
 void handle_list_files(int socket, char *user);
+// Funciones Extra
+void handle_getmultifile(int socket, char *user);
 
 void handle_poweroff() {
   close(server_sock);
@@ -52,6 +54,37 @@ int send_ret_value(int socket, uint8_t ret) {
     return -1;
   }
   return 0;
+}
+
+/*
+ * Función auxiliar que compara si la terminación del path de dos ficheros es igual
+ */
+bool is_same_file(const char *file1, const char *file2) {
+  // Buscar la última ocurrencia de '/' y '\' en file1
+  const char *slash1 = strrchr(file1, '/');
+  const char *backslash1 = strrchr(file1, '\\');
+  const char *name1 = file1;
+
+  if (slash1 && backslash1)
+    name1 = (slash1 > backslash1) ? slash1 + 1 : backslash1 + 1;
+  else if (slash1)
+    name1 = slash1 + 1;
+  else if (backslash1)
+    name1 = backslash1 + 1;
+
+  // Repetir para file2
+  const char *slash2 = strrchr(file2, '/');
+  const char *backslash2 = strrchr(file2, '\\');
+  const char *name2 = file2;
+
+  if (slash2 && backslash2)
+    name2 = (slash2 > backslash2) ? slash2 + 1 : backslash2 + 1;
+  else if (slash2)
+    name2 = slash2 + 1;
+  else if (backslash2)
+    name2 = backslash2 + 1;
+
+  return strcmp(name1, name2) == 0;
 }
 
 void handle_register(int socket, char *user) {
@@ -214,6 +247,8 @@ void handle_list_files(int socket, char *user) {
   int res = get_user_files(&usuarios, user, other, &files, &num_files);
   if (send_ret_value(socket, (uint8_t) res) != 0) {
     printf("s> error sending return value to %s\n", user);
+    close(socket);
+    free(files);
     return;
   }
 
@@ -223,6 +258,7 @@ void handle_list_files(int socket, char *user) {
     size_t len = strlen(buffer) + 1;
     if (send_message(socket, buffer, len) != 0) {
       free(files);
+      close(socket);
       return;
     }
 
@@ -230,11 +266,117 @@ void handle_list_files(int socket, char *user) {
       len = strnlen(files[i].path, sizeof(files[i].path)) + 1;
       if (send_message(socket, files[i].path, len) != 0) {
         free(files);
+        close(socket);
         return;
       }
     }
   }
   free(files);
+}
+
+void handle_getmultifile(int socket, char *user) {
+  // Primero, nos ha de llegar el path del fichero
+  char file_path[MAX_FILE_PATH_SIZE] = {0};
+  ssize_t bytes_read = read_line(socket, file_path, sizeof(file_path));
+  file_path[sizeof(file_path) - 1] = '\0'; // Por si acaso
+  if (bytes_read <= 0) {
+    perror("s> error reading file path");
+    close(socket);
+    return;
+  }
+
+  // Ahora, nos recorremos todos los ficheros de todos los usuarios para
+  // comprobar quién tiene el fichero y enviárselo al cliente
+  connected_user_t *conn_users = NULL;
+  uint32_t num_users = 0;
+  u_int32_t users_with_file = 0;
+
+  int res_con_users = get_connected_users(&usuarios, user, &conn_users, &num_users);
+
+  if (res_con_users != 0) {
+    send_ret_value(socket, (uint8_t) res_con_users);
+    close(socket);
+    return;
+  }
+
+  for (u_int32_t i = 0; i < num_users; i++) {
+    file_t *files = NULL;
+    uint32_t num_files = 0;
+    int res_get_user_files = get_user_files(&usuarios, user, conn_users[i].name, &files, &num_files);
+    if (res_get_user_files == 0 && num_files > 0) {
+      for (u_int32_t j = 0; j < num_files; j++) {
+        if (is_same_file(files[j].path, file_path)) {
+          users_with_file++;
+        }
+      }
+    }
+    free(files);
+  }
+
+  // Ahora que ya sabemos cuántos usuarios tienen el fichero, enviamos el número de usuarios que lo poseen
+  if (users_with_file > 255) {
+    users_with_file = 255;
+  } else if (users_with_file == 0) {
+    if (send_ret_value(socket, (uint8_t) 1) != 0) {
+      perror("s> error sending return value to user");
+      close(socket);
+      free(conn_users);
+      return;
+    }
+  }
+  // Primero enviamos el código de operación de que ha ido bien
+  if (send_ret_value(socket, (uint8_t) 0) != 0) {
+    perror("s> error sending return value to user");
+    close(socket);
+    free(conn_users);
+    return;
+  }
+
+  // Ahora enviamos el número de usuarios que tienen el fichero
+  if (send_ret_value(socket, (uint8_t) users_with_file) != 0) {
+    perror("s> error sending return value to user");
+    close(socket);
+    free(conn_users);
+    return;
+  }
+
+  // Ahora, por cada usuario, enviamos su ip, su puerto y el ruta del fichero.
+  // enviar la ruta es necesario porque un mismo fichero puede estar en dos rutas distintas.
+  for (u_int32_t i = 0; i < num_users; i++) {
+    file_t *files = NULL;
+    uint32_t num_files = 0;
+    int res_get_user_files = get_user_files(&usuarios, user, conn_users[i].name, &files, &num_files);
+    if (res_get_user_files == 0 && num_files > 0) {
+      for (u_int32_t j = 0; j < num_files; j++) {
+        if (is_same_file(files[j].path, file_path)) {
+          size_t len = strnlen(conn_users[i].ip, sizeof(conn_users[i].ip)) + 1;
+          if (send_message(socket, conn_users[i].ip, len) != 0) {
+            free(conn_users);
+            close(socket);
+            return;
+          }
+          char buffer[32] = {0};
+          snprintf(buffer, sizeof(buffer), "%u", conn_users[i].port);
+          len = strlen(buffer) + 1;
+          if (send_message(socket, buffer, len) != 0) {
+            free(conn_users);
+            close(socket);
+            return;
+          }
+          len = strnlen(files[j].path, sizeof(files[j].path)) + 1;
+          if (send_message(socket, files[j].path, len) != 0) {
+            free(conn_users);
+            close(socket);
+            return;
+          }
+        }
+      }
+    }
+    free(files);
+  }
+
+  close(socket);
+  free(conn_users);
 }
 
 void *handle_request(void *arg) {
@@ -289,6 +431,8 @@ void *handle_request(void *arg) {
     handle_list_users(client_sock, user);
   } else if (strcmp(operation, "LIST_CONTENT") == 0) {
     handle_list_files(client_sock, user);
+  } else if (strcmp(operation, "GET_MULTIFILE") == 0) {
+    handle_getmultifile(client_sock, user);
   } else {
     printf("s> unknown operation: %s\n", operation);
   }

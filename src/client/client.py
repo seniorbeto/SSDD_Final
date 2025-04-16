@@ -564,6 +564,14 @@ class client:
 
     @staticmethod
     def getmultifile(remote_FileName, local_FileName):
+        """
+        Esta función no está en el enunciado de la práctica. Se trata de recibir un fichero
+        desde varios usuarios al mismo tiempo y guardarlo en el directorio local, desplegando un
+        hilo por cada usuario.
+        :param remote_FileName:
+        :param local_FileName:
+        :return:
+        """
         if client._current_user_connected is None:
             print("c> GET_MULTIFILE FAIL, USER NOT CONNECTED")
             return client.RC.USER_ERROR
@@ -582,17 +590,21 @@ class client:
 
             response = int.from_bytes(sck.recv(1), byteorder='big')
             if response == 0:
-                # Éxito
-                print("c> GET_MULTIFILE OK")
+                # Primero recibimos el número de usuarios que tienen el fichero
+                num_users = int.from_bytes(sck.recv(1), byteorder='big')
 
-                # Ahora, recibimos el fichero
-                with open(local_FileName, 'wb') as f:
-                    while True:
-                        data = sck.recv(1)
-                        if not data:
-                            break
-                        f.write(data)
-                sck.close()
+                print("recibido: ", num_users)
+                # Por cada usuario, recibimos su ip y su puerto
+                users = []
+                for _ in range(num_users):
+                    ip = recv_cstring(sck)
+                    port = recv_cstring(sck)
+                    file_path = recv_cstring(sck)
+                    users.append((ip, port, file_path))
+
+                for ip, port, file_path in users:
+                    print(ip, port, file_path)
+
                 return client.RC.OK
             elif response == 1:
                 print("c> GET_MULTIFILE FAIL, NO USER CONNECTED HAVE FILE")
@@ -692,7 +704,7 @@ class client:
                             print("Syntax error. Usage: GET_FILE <userName> <remote_fileName> <local_fileName>")
 
                     elif (line[0] == "GET_MULTIFILE"):
-                        if (len(line) == 4):
+                        if (len(line) == 3):
                             client.getmultifile(line[1], line[2])
                         else:
                             print("Syntax error. Usage: GET_MULTIFILE <remote_fileName> <local_fileName>")

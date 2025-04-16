@@ -10,6 +10,41 @@ from enum import Enum
 from netools import recv_cstring
 from server_svc import ServerThread
 
+def download_range(ip, port, remote_filepath, seeder_id, total_seeders):
+    """Descarga la porción asignada de un seeder y la guarda en un fichero temporal."""
+    temp_filename = f"{seeder_id}.temp"
+    print("Creando fichero temporal para el seeder ", seeder_id)
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.connect((ip, int(port)))
+        # Enviar comando GET_MULTIFILE
+        s.sendall("GET_MULTIFILE\0".encode())
+        s.sendall((remote_filepath + "\0").encode())
+        # Envío de parámetros: seeder id y total de seeders
+        s.sendall((str(seeder_id) + "\0").encode())
+        s.sendall((str(total_seeders) + "\0").encode())
+
+        # Esperamos confirmación del seeder (0 indica OK)
+        response = int.from_bytes(s.recv(1), byteorder='big')
+        if response != 0:
+            print(f"Peer {ip}:{port} respondió con error en GET_MULTIFILE")
+            s.close()
+            return False
+
+        # Descargamos hasta que se cierre la conexión
+        with open(temp_filename, "wb") as ftemp:
+            while True:
+                chunk = s.recv(1024)
+                if not chunk:
+                    break
+                ftemp.write(chunk)
+        s.close()
+        print(f"Descargado fragmento {seeder_id} desde {ip}:{port} en '{temp_filename}'")
+        return True
+    except Exception as e:
+        print(f"Error en download_range con {ip}:{port} - {e}")
+        return False
+
 
 class client:
     # ******************** TYPES *********************
@@ -602,8 +637,33 @@ class client:
                     file_path = recv_cstring(sck)
                     users.append((ip, port, file_path))
 
-                for ip, port, file_path in users:
-                    print(ip, port, file_path)
+                # A partir de aquí, ya sabemos cuántos usuarios tienen el fichero y quiénes son exactamente
+                # por lo que procederemos a decir a cada usuario qué parte del fichero nos tienen que enviar
+                # para que lo ensamblemos según la porción que le corresponda a cada uno.
+                threads = []
+                # Lanzamos un hilo por cada seeder
+                for seeder_id, (ip, port, file_path) in enumerate(users):
+                    t = threading.Thread(target=download_range,
+                                         args=(ip, port, remote_FileName.strip("\0"), seeder_id, num_users))
+                    threads.append(t)
+                    t.start()
+
+                for t in threads:
+                    t.join()
+
+                # Una vez descargados todos los fragmentos, concatenarlos en el fichero final.
+                with open(local_FileName, "wb") as fout:
+                    for seeder_id in range(num_users):
+                        temp_filename = f"{seeder_id}.temp"
+                        if os.path.exists(temp_filename):
+                            with open(temp_filename, "rb") as fin:
+                                fout.write(fin.read())
+                            os.remove(temp_filename)
+                        else:
+                            print(f"Error: Fichero temporal '{temp_filename}' no encontrado.")
+                            return client.RC.ERROR
+
+                print(f"Fichero ensamblado en '{local_FileName}'")
 
                 return client.RC.OK
             elif response == 1:

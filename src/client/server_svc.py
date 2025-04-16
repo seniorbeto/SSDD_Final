@@ -138,4 +138,45 @@ class ServerThread(threading.Thread):
                 client.close()
                 logging.info("Conexión cerrada tras manejo de solicitud.")
 
-        elif operation == "GET_MULTIFILE": ...
+        elif operation == "GET_MULTIFILE":
+            try:
+                # Recibir seeder id y total de seeders (como C-strings)
+                seeder_id_str = recv_cstring(client)
+                total_seeders_str = recv_cstring(client)
+                seeder_id = int(seeder_id_str)
+                total_seeders = int(total_seeders_str)
+                logging.info(f"GET_MULTIFILE: seeder_id={seeder_id}, total_seeders={total_seeders}")
+            except Exception as e:
+                logging.exception("Error al recibir parámetros de GET_MULTIFILE")
+                client.send(b'\x02')
+                client.close()
+                return
+
+            # Obtener el tamaño total del fichero
+            file_size = os.path.getsize(file_path)
+            part_size = file_size // total_seeders
+            offset = seeder_id * part_size
+            if seeder_id == total_seeders - 1:
+                length = file_size - offset  # El último seeder toma el residuo
+            else:
+                length = part_size
+
+            # Enviar confirmación
+            client.send(b'\x00')
+            try:
+                with open(file_path, "rb") as f:
+                    f.seek(offset)
+                    bytes_sent = 0
+                    while bytes_sent < length:
+                        chunk = f.read(min(1024, length - bytes_sent))
+                        if not chunk:
+                            break
+                        client.send(chunk)
+                        bytes_sent += len(chunk)
+                logging.info(f"Envío completado de la porción del fichero {file_path} (offset: {offset}, longitud: {length})")
+            except Exception as e:
+                client.send(b'\x02')
+                logging.exception("Error durante el envío del fragmento:")
+            finally:
+                client.close()
+                logging.info("Conexión cerrada tras manejo de GET_MULTIFILE.")

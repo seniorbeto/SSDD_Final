@@ -513,8 +513,8 @@ class client:
         # Ahora, obtenemos el puerto y la ip del cliente "user"
         lines = output.splitlines()
         for line in lines:
-            if line.startswith(f"\tUSER") and user in line:
-                parts = line.split()
+            parts = line.split()
+            if parts[1] == user:
                 ip = parts[2]
                 port = int(parts[3])
                 break
@@ -525,7 +525,9 @@ class client:
         sck = None
         try:
             sck = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            print("Conectando a", ip, port)
             sck.connect((ip, port))
+            print("Conectado")
             sck.sendall("GET_FILE\0".encode())
             sck.sendall(remote_FileName.encode() + b"\0")
 

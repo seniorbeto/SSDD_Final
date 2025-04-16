@@ -8,6 +8,7 @@ from contextlib import redirect_stdout
 from enum import Enum
 
 from netools import recv_cstring
+from server_svc import ServerThread
 
 
 class client:
@@ -25,9 +26,7 @@ class client:
     # ****************** ATTRIBUTES ******************
     _server = None
     _port = -1
-    _listen_thread = None
-    _listen_port = None
-    _listen_socket = None
+    _listen_thread: ServerThread = None
     _current_user_connected = None
     # ******************** METHODS *******************
 
@@ -109,18 +108,9 @@ class client:
         sck = None
         success = False
         try:
-            # Antes de mandar nada al servidor, vamos a crear el socket de escucha
-            client._listen_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            client._listen_socket.bind(('', 0))  # Lo bindeamos al primer puerto que esté libre
-            client._listen_socket.listen(10)
-
-            # Obtenemos el puerto asignado
-            client._listen_port = client._listen_socket.getsockname()[1]
-
-            # Ahora que tenemos el socket de escucha, desplegamos el hilo que permitirá conexiones
-            # entrantes de otros clientes
-            client._listen_thread = threading.Thread(target=client._downloads_handler, daemon=True)
+            client._listen_thread = ServerThread()
             client._listen_thread.start()
+            port = client._listen_thread.get_port()
 
             # AHORA ya podemos enviar cosas al servidor
             sck = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -129,7 +119,7 @@ class client:
             sck.sendall("CONNECT\0".encode())
             username = user + "\0"
             sck.sendall(username.encode())
-            listen_port = str(client._listen_port) + "\0"
+            listen_port = str(port) + "\0"
             sck.sendall(listen_port.encode())
 
             response = int.from_bytes(sck.recv(1), byteorder='big')
@@ -158,12 +148,10 @@ class client:
         finally:
             if sck:
                 sck.close()
-            # Cerrar el socket de escucha si se produce un error
-            if not success and client._listen_socket:
-                client._listen_socket.close()
-                client._listen_socket = None
-                client._listen_port = None
+            if not success and client._listen_thread:
+                client._listen_thread.kill()
                 client._listen_thread = None
+
 
         return client.RC.ERROR
 
@@ -187,15 +175,9 @@ class client:
             response = int.from_bytes(sck.recv(1), byteorder='big')
             if response == 0:
                 sck.close()
-
-                # Si ha salido bien, ahora cerramos el socket de escucha
-                if client._listen_socket:
-                    client._listen_socket.close()
-                    client._listen_socket = None
-                    client._listen_port = None
-
                 # y matamos al hilo
                 if client._listen_thread:
+                    client._listen_thread.kill()
                     client._listen_thread = None
 
                 client._current_user_connected = None
@@ -513,8 +495,68 @@ class client:
 
     @staticmethod
     def getfile(user, remote_FileName, local_FileName):
+        if client._current_user_connected is None:
+            print("c> GET_FILE FAIL, USER NOT CONNECTED")
+            return client.RC.USER_ERROR
 
-        #  Write your code here
+
+        # El siguiente fragmento de código sirve para redirigir la salida estándar a un buffer
+        # para capturar la salida de la funcón listusers(). De esta manera, no se visualiza por terminal
+        with io.StringIO() as buf, redirect_stdout(buf):
+            client.listusers()
+            output = buf.getvalue()
+
+        if "LIST_USERS OK" not in output:
+            print("c> GET_FILE FAIL, LIST_USERS ERROR")
+            return client.RC.ERROR
+
+        # Ahora, obtenemos el puerto y la ip del cliente "user"
+        lines = output.splitlines()
+        for line in lines:
+            if line.startswith(f"\tUSER") and user in line:
+                parts = line.split()
+                ip = parts[2]
+                port = int(parts[3])
+                break
+        else:
+            print(f"c> GET_FILE FAIL, USER {user} NOT FOUND")
+            return client.RC.USER_ERROR
+
+        sck = None
+        try:
+            sck = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sck.connect((ip, port))
+            sck.sendall("GET_FILE\0".encode())
+            sck.sendall(remote_FileName.encode() + b"\0")
+
+            response = int.from_bytes(sck.recv(1), byteorder='big')
+            if response == 0:
+                # Ahora, recibimos el fichero
+                with open(local_FileName, 'wb') as f:
+                    while True:
+                        data = sck.recv(1)
+                        if not data:
+                            break
+                        f.write(data)
+                print("c> GET_FILE OK")
+                sck.close()
+                return client.RC.OK
+            elif response == 1:
+                print("c> GET_FILE FAIL, FILE DOES NOT EXIST")
+                sck.close()
+                return client.RC.USER_ERROR
+            elif response == 2:
+                print("c> GET_FILE FAIL")
+                sck.close()
+                return client.RC.USER_ERROR
+            else:
+                print("c> UNKNOWN RESPONSE FROM SERVER:", response)
+        except Exception as e:
+            print("c> GET_FILE CLIENT ERROR -", str(e))
+            return client.RC.ERROR
+        finally:
+            if sck:
+                sck.close()
 
         return client.RC.ERROR
 

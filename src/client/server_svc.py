@@ -107,7 +107,7 @@ class ServerThread(threading.Thread):
             return
 
         # Verificamos que la operación sea "GET_FILE"
-        if operation != "GET_FILE" or operation != "GET_MULTIFILE":
+        if operation != "GET_FILE" and operation != "GET_MULTIFILE":
             client.send(b'\x02')
             client.close()
             logging.warning("Operación no válida recibida. Se cierra la conexión.")
@@ -140,7 +140,8 @@ class ServerThread(threading.Thread):
 
         elif operation == "GET_MULTIFILE":
             try:
-                # Recibir seeder id y total de seeders (como C-strings)
+                # Recibir seeder id y total de seeders (Necesario para saber qué fragmento del fichero tenemos que
+                # enviar)
                 seeder_id_str = recv_cstring(client)
                 total_seeders_str = recv_cstring(client)
                 seeder_id = int(seeder_id_str)
@@ -157,7 +158,7 @@ class ServerThread(threading.Thread):
             part_size = file_size // total_seeders
             offset = seeder_id * part_size
             if seeder_id == total_seeders - 1:
-                length = file_size - offset  # El último seeder toma el residuo
+                length = file_size - offset  # El último seeder toma el resto
             else:
                 length = part_size
 

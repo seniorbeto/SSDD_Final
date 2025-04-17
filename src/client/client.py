@@ -13,7 +13,6 @@ from server_svc import ServerThread
 def download_range(ip, port, remote_filepath, seeder_id, total_seeders):
     """Descarga la porción asignada de un seeder y la guarda en un fichero temporal."""
     temp_filename = f"{seeder_id}.temp"
-    print("Creando fichero temporal para el seeder ", seeder_id)
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.connect((ip, int(port)))
@@ -27,7 +26,6 @@ def download_range(ip, port, remote_filepath, seeder_id, total_seeders):
         # Esperamos confirmación del seeder (0 indica OK)
         response = int.from_bytes(s.recv(1), byteorder='big')
         if response != 0:
-            print(f"Peer {ip}:{port} respondió con error en GET_MULTIFILE")
             s.close()
             return False
 
@@ -39,10 +37,8 @@ def download_range(ip, port, remote_filepath, seeder_id, total_seeders):
                     break
                 ftemp.write(chunk)
         s.close()
-        print(f"Descargado fragmento {seeder_id} desde {ip}:{port} en '{temp_filename}'")
         return True
     except Exception as e:
-        print(f"Error en download_range con {ip}:{port} - {e}")
         return False
 
 
@@ -560,9 +556,7 @@ class client:
         sck = None
         try:
             sck = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            print("Conectando a", ip, port)
             sck.connect((ip, port))
-            print("Conectado")
             sck.sendall("GET_FILE\0".encode())
             sck.sendall(remote_FileName.encode() + b"\0")
 
@@ -644,7 +638,7 @@ class client:
                 # Lanzamos un hilo por cada seeder
                 for seeder_id, (ip, port, file_path) in enumerate(users):
                     t = threading.Thread(target=download_range,
-                                         args=(ip, port, remote_FileName.strip("\0"), seeder_id, num_users))
+                                         args=(ip, port, file_path.strip("\0"), seeder_id, num_users))
                     threads.append(t)
                     t.start()
 
@@ -663,7 +657,7 @@ class client:
                             print(f"Error: Fichero temporal '{temp_filename}' no encontrado.")
                             return client.RC.ERROR
 
-                print(f"Fichero ensamblado en '{local_FileName}'")
+                print(f"c> GET_MULTIFILE OK")
 
                 return client.RC.OK
             elif response == 1:
@@ -774,6 +768,30 @@ class client:
                             break
                         else:
                             print("Syntax error. Use: QUIT")
+
+                    elif (line[0] == "HELP"):
+                        print("Commands:")
+                        print("\tREGISTER <userName>")
+                        print("\tUNREGISTER <userName>")
+                        print("\tCONNECT <userName>")
+                        print("\tDISCONNECT <userName>")
+                        print("\tPUBLISH <fileName> <description>")
+                        print("\tDELETE <fileName>")
+                        print("\tLIST_USERS")
+                        print("\tLIST_CONTENT <userName>")
+                        print("\tGET_FILE <userName> <remote_fileName> <local_fileName>")
+                        print("\tGET_MULTIFILE <remote_fileName> <local_fileName>")
+                        print("\tQUIT")
+
+                    elif (line[0] == "SET1"): # DEBUF. QUITAR MÁS ADELANTE
+                        client.register("pepe")
+                        client.connect("pepe")
+                        client.publish("testo.txt", "test")
+                    elif (line[0] == "SET2"): # DEBUF. QUITAR MÁS ADELANTE
+                        client.register("popo")
+                        client.connect("popo")
+                        client.publish("testo.txt", "yo también lo tengo")
+                        client.publish("client.py", "el código fuente")
                     else:
                         print("Error: command " + line[0] + " not valid.")
 

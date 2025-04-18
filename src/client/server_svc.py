@@ -90,6 +90,15 @@ class ServerThread(threading.Thread):
 
     def kill(self):
         logging.info("Se solicita cerrar ServerThread...")
+        if self.upnp:
+            try:
+                removed = self.upnp.deleteportmapping(self._port, 'TCP')
+                if removed:
+                    logging.info(f"Mapping UPnP eliminado: puerto {self._port}")
+                else:
+                    logging.warning(f"No se pudo eliminar el mapping UPnP en el puerto {self._port}")
+            except Exception as e:
+                logging.exception("Error al eliminar mapping UPnP:")
         self.__socket.close()
         self.__stop_event.set()
         self.join()

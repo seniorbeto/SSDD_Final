@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Dashboard P2P</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+<header>
+    Bienvenido, {{ username }}
+    <a id="logout" href="{{ url_for('logout') }}">Cerrar sesión</a>
+</header>
+<div class="container">
+    <div class="sidebar">
+        <h2>Usuarios conectados</h2>
+        <div id="users-list"></div>
+    </div>
+    <div class="main">
+        <h2>Contenido de <span id="selected-user">Ninguno</span></h2>
+        <ul id="content-list"></ul>
+    </div>
+</div>
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>

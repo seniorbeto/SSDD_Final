@@ -1,11 +1,14 @@
 #include <arpa/inet.h>
 #include <errno.h>
 #include <pthread.h>
+#include <rpc/rpc.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+
+#include "../logger/logger.h"
 #include "claves.h"
 #include "lines.h"
 #include "stdbool.h"
@@ -86,6 +89,52 @@ bool is_same_file(const char *file1, const char *file2) {
     name2 = backslash2 + 1;
 
   return strcmp(name1, name2) == 0;
+}
+
+int get_ip_address(char *ip) {
+  char *ip_local = getenv("LOG_RPC_IP");
+  if (!ip_local) {
+    return -1;
+  }
+  strcpy(ip, ip_local);
+  return 0;
+}
+
+/*
+ * Función auxiliar que crea un cliente RPC para el logger
+ */
+static CLIENT *get_rpc_client() {
+  char rpc_server_ip[16] = {0};
+  if (get_ip_address(rpc_server_ip) != 0) {
+    fprintf(stderr, "s> error getting RPC server IP from env variable\n");
+    return NULL;
+  }
+  CLIENT *clnt = clnt_create(rpc_server_ip, LOGGER_PROG, LOGGER_VERS, "udp");
+  if (clnt == NULL) {
+    clnt_pcreateerror(rpc_server_ip);
+    return NULL;
+  }
+  return clnt;
+}
+
+/*
+ * Función auxiliar que loggea la operación
+ */
+int log_operation(char *user, char *operation, char *datetime) {
+  CLIENT *clnt = get_rpc_client();
+  if (clnt == NULL) {
+    return -1;
+  }
+
+  log_entry entry;
+  entry.username = user;
+  entry.operation = operation;
+  entry.timestamp = datetime;
+
+  // Llamada RPC
+  log_op_1(&entry, clnt);
+  clnt_destroy(clnt);
+  return 0;
 }
 
 void handle_register(int socket, char *user) {
@@ -414,6 +463,7 @@ void *handle_request(void *arg) {
     return NULL;
   }
 
+  // Por último, leemos el nombre de usuario
   char user[MAX_USER_MSG_SIZE];
   memset(user, 0, MAX_USER_MSG_SIZE);
 
@@ -424,7 +474,12 @@ void *handle_request(void *arg) {
     return NULL;
   }
 
-  printf("s> OPERATION %s FROM %s AT %s\n", operation, user, datetime);
+  // Loggeamos la operación en el servicio RPC
+  if (log_operation(user, operation, datetime) != 0) {
+    printf("s> error logging operation. (is the rpc service initialized?) Continuing anyway...\n");
+  }
+
+  //printf("s> OPERATION %s FROM %s AT %s\n", operation, user, datetime);
 
   // Aquí se realizan las operaciones
   if (strcmp(operation, "REGISTER") == 0) {

@@ -11,6 +11,7 @@
 #include "stdbool.h"
 
 #define MAX_MSG_SIZE 2048
+#define MAX_DATETIME_SIZE 64
 #define MAX_OP_MSG_SIZE 64
 #define MAX_USER_MSG_SIZE 255
 #define MAX_FILE_PATH_SIZE 256
@@ -402,6 +403,17 @@ void *handle_request(void *arg) {
     return NULL;
   }
 
+  // Después, leemos el datetime
+  char datetime[MAX_DATETIME_SIZE];
+  memset(datetime, 0, MAX_DATETIME_SIZE);
+
+  const ssize_t bytes_read_datetime = read_line(client_sock, datetime, MAX_DATETIME_SIZE);
+  if (bytes_read_datetime <= 0) {
+    perror("s> error reading datetime");
+    close(client_sock);
+    return NULL;
+  }
+
   char user[MAX_USER_MSG_SIZE];
   memset(user, 0, MAX_USER_MSG_SIZE);
 
@@ -412,7 +424,7 @@ void *handle_request(void *arg) {
     return NULL;
   }
 
-  printf("s> OPERATION %s FROM %s\n", operation, user);
+  printf("s> OPERATION %s FROM %s AT %s\n", operation, user, datetime);
 
   // Aquí se realizan las operaciones
   if (strcmp(operation, "REGISTER") == 0) {

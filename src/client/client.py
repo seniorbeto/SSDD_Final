@@ -6,6 +6,7 @@ import os
 import io
 from contextlib import redirect_stdout
 from enum import Enum
+from zeep import Client
 
 from netools import recv_cstring
 from server_svc import ServerThread
@@ -59,6 +60,8 @@ class client:
     _port = -1
     _listen_thread: ServerThread = None
     _current_user_connected = None
+    # El web service siempre se conecta al localhost
+    _ws_client = Client(wsdl="http://127.0.0.1:8000/?wsdl")
     # ******************** METHODS *******************
 
     @staticmethod
@@ -72,6 +75,7 @@ class client:
 
         try:
             sck.sendall("REGISTER\0".encode())
+            sck.sendall((client._ws_client.service.get_datetime("") + "\0").encode())
             username = user + "\0"
             sck.sendall(username.encode())
 
@@ -106,6 +110,7 @@ class client:
 
         try:
             sck.sendall("UNREGISTER\0".encode())
+            sck.sendall((client._ws_client.service.get_datetime("") + "\0").encode())
             username = user + "\0"
             sck.sendall(username.encode())
 
@@ -148,6 +153,7 @@ class client:
             sck.connect((client._server, client._port))
 
             sck.sendall("CONNECT\0".encode())
+            sck.sendall((client._ws_client.service.get_datetime("") + "\0").encode())
             username = user + "\0"
             sck.sendall(username.encode())
             listen_port = str(port) + "\0"
@@ -199,6 +205,7 @@ class client:
             sck = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             sck.connect((client._server, client._port))
             sck.sendall("DISCONNECT\0".encode())
+            sck.sendall((client._ws_client.service.get_datetime("") + "\0").encode())
             username = user + "\0"
             sck.sendall(username.encode())
 
@@ -273,6 +280,7 @@ class client:
             sck = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             sck.connect((client._server, client._port))
             sck.sendall("PUBLISH\0".encode())
+            sck.sendall((client._ws_client.service.get_datetime("") + "\0").encode())
             username = client._current_user_connected + "\0"
             sck.sendall(username.encode())
 
@@ -346,6 +354,7 @@ class client:
             sck = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             sck.connect((client._server, client._port))
             sck.sendall("DELETE\0".encode())
+            sck.sendall((client._ws_client.service.get_datetime("") + "\0").encode())
             username = client._current_user_connected + "\0"
             sck.sendall(username.encode())
 
@@ -395,6 +404,7 @@ class client:
             sck = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             sck.connect((client._server, client._port))
             sck.sendall("LIST_USERS\0".encode())
+            sck.sendall((client._ws_client.service.get_datetime("") + "\0").encode())
             username = client._current_user_connected + "\0"
             sck.sendall(username.encode())
 
@@ -465,6 +475,7 @@ class client:
             sck = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             sck.connect((client._server, client._port))
             sck.sendall("LIST_CONTENT\0".encode())
+            sck.sendall((client._ws_client.service.get_datetime("") + "\0").encode())
             username = client._current_user_connected + "\0"
             sck.sendall(username.encode())
 
@@ -610,6 +621,7 @@ class client:
             sck = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             sck.connect((client._server, client._port))
             sck.sendall("GET_MULTIFILE\0".encode())
+            sck.sendall((client._ws_client.service.get_datetime("") + "\0").encode())
             username = client._current_user_connected + "\0"
             sck.sendall(username.encode())
 

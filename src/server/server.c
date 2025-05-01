@@ -27,18 +27,19 @@ bool req_ready = false;
 // Variables globales
 int server_sock;
 user_t *usuarios = NULL;
+CLIENT *clnt = NULL;
 
 // Cabeceras
-void handle_register(int socket, char *user);
-void handle_unregister(int socket, char *user);
-void handle_connect(int socket, char *user);
-void handle_disconnect(int socket, char *user);
-void handle_publish(int socket, char *user);
-void handle_delete(int socket, char *user);
-void handle_list_users(int socket, char *user);
-void handle_list_files(int socket, char *user);
+void handle_register(int socket, char *user, char *datetime);
+void handle_unregister(int socket, char *user, char *datetime);
+void handle_connect(int socket, char *user, char *datetime);
+void handle_disconnect(int socket, char *user, char *datetime);
+void handle_publish(int socket, char *user, char *datetime);
+void handle_delete(int socket, char *user, char *datetime);
+void handle_list_users(int socket, char *user, char *datetime);
+void handle_list_files(int socket, char *user, char *datetime);
 // Funciones Extra
-void handle_getmultifile(int socket, char *user);
+void handle_getmultifile(int socket, char *user, char *datetime);
 
 void handle_poweroff() {
   close(server_sock);
@@ -109,21 +110,23 @@ static CLIENT *get_rpc_client() {
     fprintf(stderr, "s> error getting RPC server IP from env variable\n");
     return NULL;
   }
-  CLIENT *clnt = clnt_create(rpc_server_ip, LOGGER_PROG, LOGGER_VERS, "udp");
-  if (clnt == NULL) {
+  CLIENT *client = clnt_create(rpc_server_ip, LOGGER_PROG, LOGGER_VERS, "udp");
+  if (client == NULL) {
     clnt_pcreateerror(rpc_server_ip);
     return NULL;
   }
-  return clnt;
+  return client;
 }
 
 /*
  * Función auxiliar que loggea la operación
  */
-int log_operation(char *user, char *operation, char *datetime) {
-  CLIENT *clnt = get_rpc_client();
+int log_operation(char *user, char *operation, char *datetime, char *filename) {
   if (clnt == NULL) {
-    return -1;
+    clnt = get_rpc_client();
+    if (clnt == NULL) {
+      return -1;
+    }
   }
 
   log_entry entry;
@@ -131,29 +134,45 @@ int log_operation(char *user, char *operation, char *datetime) {
   entry.operation = operation;
   entry.timestamp = datetime;
 
+  if (filename != NULL) {
+    entry.filename = filename;
+  } else {
+    entry.filename = "";
+  }
+
   // Llamada RPC
-  log_op_1(&entry, clnt);
-  clnt_destroy(clnt);
+  if (log_op_1(&entry, clnt) == NULL) {
+    clnt_perror(clnt, "s> error calling RPC. Try again.");
+    clnt_destroy(clnt);
+    clnt = NULL;
+    return -1;
+  }
   return 0;
 }
 
-void handle_register(int socket, char *user) {
+void handle_register(int socket, char *user, char *datetime) {
   // En la operación register, solo hace falta el código de operación y el nombre de usuario
   int res = add_user(&usuarios, user);
   if (send_ret_value(socket, (uint8_t) res) != 0) {
     printf("s> error sending return value to %s", user);
   }
+  if (log_operation(user, "REGISTER", datetime, NULL) != 0) {
+    printf("s> error logging operation\n");
+  }
 }
 
-void handle_unregister(int socket, char *user) {
+void handle_unregister(int socket, char *user, char *datetime) {
   // En la operación unregister, solo hace falta el código de operación y el nombre de usuario
   int res = remove_user(&usuarios, user);
   if (send_ret_value(socket, (uint8_t) res) != 0) {
     printf("s> error sending return value to %s", user);
   }
+  if (log_operation(user, "UNREGISTER", datetime, NULL) != 0) {
+    printf("s> error logging operation\n");
+  }
 }
 
-void handle_connect(int socket, char *user) {
+void handle_connect(int socket, char *user, char *datetime) {
   // En este caso, todavía nos falta por llegar el puerto del cliente
   char port_str[16] = {0};
   ssize_t bytes_read = read_line(socket, port_str, sizeof(port_str));
@@ -182,17 +201,23 @@ void handle_connect(int socket, char *user) {
   if (send_ret_value(socket, (uint8_t) res) != 0) {
     printf("s> error sending return value to %s", user);
   }
+  if (log_operation(user, "CONNECT", datetime, NULL) != 0) {
+    printf("s> error logging operation\n");
+  }
 }
 
-void handle_disconnect(int socket, char *user) {
+void handle_disconnect(int socket, char *user, char *datetime) {
   // En la operación disconnect, solo hace falta el código de operación y el nombre de usuario
   int res = disconnect_user(&usuarios, user);
   if (send_ret_value(socket, (uint8_t) res) != 0) {
     printf("s> error sending return value to %s", user);
   }
+  if (log_operation(user, "DISCONNECT", datetime, NULL) != 0) {
+    printf("s> error logging operation\n");
+  }
 }
 
-void handle_publish(int socket, char *user) {
+void handle_publish(int socket, char *user, char *datetime) {
   // Aquí, todavía nos falta por llegar la ruta del fichero y su descripcción,
   // ambos valores como más de 256 caracteres
   char file_path[MAX_FILE_PATH_SIZE] = {0};
@@ -217,9 +242,12 @@ void handle_publish(int socket, char *user) {
   if (send_ret_value(socket, (uint8_t) res) != 0) {
     printf("s> error sending return value to %s", user);
   }
+  if (log_operation(user, "PUBLISH", datetime, file_path) != 0) {
+    printf("s> error logging operation\n");
+  }
 }
 
-void handle_delete(int socket, char *user) {
+void handle_delete(int socket, char *user, char *datetime) {
   char file_path[MAX_FILE_PATH_SIZE] = {0};
   ssize_t bytes_read = read_line(socket, file_path, sizeof(file_path));
   file_path[sizeof(file_path) - 1] = '\0'; // Por si acaso
@@ -233,9 +261,12 @@ void handle_delete(int socket, char *user) {
   if (send_ret_value(socket, (uint8_t) res) != 0) {
     printf("s> error sending return value to %s", user);
   }
+  if (log_operation(user, "DELETE", datetime, file_path) != 0) {
+    printf("s> error logging operation\n");
+  }
 }
 
-void handle_list_users(int socket, char *user) {
+void handle_list_users(int socket, char *user, char *datetime) {
   connected_user_t *conn_users = NULL;
   uint32_t num_users = 0;
 
@@ -279,9 +310,12 @@ void handle_list_users(int socket, char *user) {
     }
   }
   free(conn_users);
+  if (log_operation(user, "LIST_USERS", datetime, NULL) != 0) {
+    printf("s> error logging operation\n");
+  }
 }
 
-void handle_list_files(int socket, char *user) {
+void handle_list_files(int socket, char *user, char *datetime) {
   char other[MAX_USER_MSG_SIZE];
   memset(other, 0, MAX_USER_MSG_SIZE);
   ssize_t bytes_read = read_line(socket, other, sizeof(other));
@@ -322,9 +356,12 @@ void handle_list_files(int socket, char *user) {
     }
   }
   free(files);
+  if (log_operation(user, "LIST_CONTENT", datetime, other) != 0) {
+    printf("s> error logging operation\n");
+  }
 }
 
-void handle_getmultifile(int socket, char *user) {
+void handle_getmultifile(int socket, char *user, char *datetime) {
   // Primero, nos ha de llegar el path del fichero
   char file_path[MAX_FILE_PATH_SIZE] = {0};
   ssize_t bytes_read = read_line(socket, file_path, sizeof(file_path));
@@ -427,6 +464,9 @@ void handle_getmultifile(int socket, char *user) {
 
   close(socket);
   free(conn_users);
+  if (log_operation(user, "GET_MULTIFILE", datetime, file_path) != 0) {
+    printf("s> error logging operation\n");
+  }
 }
 
 void *handle_request(void *arg) {
@@ -474,34 +514,30 @@ void *handle_request(void *arg) {
     return NULL;
   }
 
-  // Loggeamos la operación en el servicio RPC
-  if (log_operation(user, operation, datetime) != 0) {
-    printf("s> error logging operation. (is the rpc service initialized?) Continuing anyway...\n");
-  }
-
-  //printf("s> OPERATION %s FROM %s AT %s\n", operation, user, datetime);
+  printf("s> OPERATION %s FROM %s AT %s\n", operation, user, datetime);
 
   // Aquí se realizan las operaciones
   if (strcmp(operation, "REGISTER") == 0) {
-    handle_register(client_sock, user);
+    handle_register(client_sock, user, datetime);
   } else if (strcmp(operation, "UNREGISTER") == 0) {
-    handle_unregister(client_sock, user);
+    handle_unregister(client_sock, user, datetime);
   } else if (strcmp(operation, "CONNECT") == 0) {
-    handle_connect(client_sock, user);
+    handle_connect(client_sock, user, datetime);
   } else if (strcmp(operation, "DISCONNECT") == 0) {
-    handle_disconnect(client_sock, user);
+    handle_disconnect(client_sock, user, datetime);
   } else if (strcmp(operation, "PUBLISH") == 0) {
-    handle_publish(client_sock, user);
+    handle_publish(client_sock, user, datetime);
   } else if (strcmp(operation, "DELETE") == 0) {
-    handle_delete(client_sock, user);
+    handle_delete(client_sock, user, datetime);
   } else if (strcmp(operation, "LIST_USERS") == 0) {
-    handle_list_users(client_sock, user);
+    handle_list_users(client_sock, user, datetime);
   } else if (strcmp(operation, "LIST_CONTENT") == 0) {
-    handle_list_files(client_sock, user);
+    handle_list_files(client_sock, user, datetime);
   } else if (strcmp(operation, "GET_MULTIFILE") == 0) {
-    handle_getmultifile(client_sock, user);
+    handle_getmultifile(client_sock, user, datetime);
   } else {
     printf("s> unknown operation: %s\n", operation);
+    log_operation(user, "UNKNOWN", datetime, NULL);
   }
 
   close(client_sock);

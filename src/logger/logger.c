@@ -4,10 +4,13 @@
 void *
 log_op_1_svc(log_entry *entry, struct svc_req *rqstp)
 {
-  printf("[%s] %s: %s\n",
+  static char res;
+  printf("[%s] %s: %s %s\n",
           entry->timestamp,
           entry->username,
-          entry->operation);
+          entry->operation,
+         entry->filename);
 
-  return NULL;
+  // Devolvemos un valor cualquiera para indicar que la operación se ha realizado correctamente
+  return (void *) &res;
 }

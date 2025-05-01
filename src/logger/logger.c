@@ -11,6 +11,9 @@ log_op_1_svc(log_entry *entry, struct svc_req *rqstp)
           entry->operation,
          entry->filename);
 
+  // flusheamos la salida
+  fflush(stdout);
+
   // Devolvemos un valor cualquiera para indicar que la operación se ha realizado correctamente
   return (void *) &res;
 }

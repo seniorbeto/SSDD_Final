@@ -541,6 +541,7 @@ void *handle_request(void *arg) {
   }
 
   close(client_sock);
+  fflush(stdout);
 
   return NULL;
 }

@@ -92,6 +92,9 @@ clean() {
     rm -f server_build.log
   popd >/dev/null
 
+  # All __pycache__ folders
+  find "$ROOT" -type d -name "__pycache__" -exec rm -rf {} +
+
   echo -e "${GREEN}=== Clean complete ===${NC}"
 }
 

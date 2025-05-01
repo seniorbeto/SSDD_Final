@@ -19,18 +19,17 @@ run_test() {
   local expected_file=$3
   local output_file="test_files/output/${test_name}.output"
 
+  echo -e -n "${BLUE}Running test '$test_name'...${NC} "
+
   # Ejecutar el cliente, redirigiendo entrada desde $input_file y guardando salida
   python3 client/client.py -s $SERVER_IP -p $SERVER_PORT < "$input_file" > "$output_file" 2>/dev/null
 
   # Comparar resultado con lo esperado
   if diff -b -B -q <(sed -E 's/[0-9]{4,5}/PORT/g' "$output_file") \
                 <(sed -E 's/[0-9]{4,5}/PORT/g' "$expected_file") >/dev/null; then
-      echo -e "${GREEN}Test '$test_name' passed.${NC}"
+      echo -e "${GREEN}OK.${NC}"
     else
-      echo -e "${RED}Test '$test_name' failed.${NC}"
-      echo -e "${YELLOW}Differences:${NC}"
-      diff -b -B <(sed -E 's/[0-9]{4,5}/PORT/g' "$output_file") \
-           <(sed -E 's/[0-9]{4,5}/PORT/g' "$expected_file")
+      echo -e "${RED}Fail.${NC}"
     fi
 }
 
@@ -49,7 +48,9 @@ python3 web_server/web_server.py > test_files/output/logs/web_service.log 2>&1 &
 WEB_SERVICE_PID=$!
 
 # tests
-run_test "test_1" "test_files/input/test_1.txt" "test_files/expected/test_1_expected.txt"
+run_test "quit" "test_files/input/quit.txt" "test_files/expected/quit_expected.txt"
+run_test "register_1" "test_files/input/register_1.txt" "test_files/expected/register_1_expected.txt"
+run_test "register_2" "test_files/input/register_2.txt" "test_files/expected/register_2_expected.txt"
 
 kill $SERVER_PID 2>/dev/null
 kill $LOGGER_PID 2>/dev/null

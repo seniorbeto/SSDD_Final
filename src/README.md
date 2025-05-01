@@ -1,4 +1,4 @@
-# SSDD_P3 – Práctica 3 de Sistemas Distribuidos
+# Práctica Final SSDD
 
 * **logger**   – Servicio RPC en C que persiste eventos
 * **server**   – Servidor C que ofrece operaciones de claves/valores y delega el log al *logger*

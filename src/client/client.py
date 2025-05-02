@@ -56,6 +56,7 @@ class client:
         USER_ERROR = 2
 
     # ****************** ATTRIBUTES ******************
+    _input_file = None
     _server = None
     _port = -1
     _listen_thread: ServerThread = None
@@ -656,8 +657,6 @@ class client:
             if response == 0:
                 # Primero recibimos el número de usuarios que tienen el fichero
                 num_users = int.from_bytes(sck.recv(1), byteorder='big')
-
-                print("recibido: ", num_users)
                 # Por cada usuario, recibimos su ip y su puerto
                 users = []
                 for _ in range(num_users):
@@ -720,110 +719,131 @@ class client:
     # * @brief Command interpreter for the client. It calls the protocol functions.
 
     @staticmethod
-    def shell():
-
-        while (True):
-
+    def shell(input_file: str = None):
+        if input_file:
+            # Modo no interactivo: leer comandos desde archivo
             try:
-
-                command = input("c> ")
-
-                line = command.split(" ")
-                if (len(line) > 0):
-                    line[0] = line[0].upper()
-                    if (line[0] == "REGISTER"):
-                        if (len(line) == 2):
-                            client.register(line[1])
-                        else:
-                            print("Syntax error. Usage: REGISTER <userName>")
-
-                    elif (line[0] == "UNREGISTER"):
-                        if (len(line) == 2):
-                            client.unregister(line[1])
-                        else:
-                            print("Syntax error. Usage: UNREGISTER <userName>")
-
-                    elif (line[0] == "CONNECT"):
-                        if (len(line) == 2):
-                            client.connect(line[1])
-                        else:
-                            print("Syntax error. Usage: CONNECT <userName>")
-
-                    elif (line[0] == "PUBLISH"):
-                        if (len(line) >= 3):
-                            #  Remove first two words
-                            description = ' '.join(line[2:])
-                            client.publish(line[1], description)
-                        else:
-                            print("Syntax error. Usage: PUBLISH <fileName> <description>")
-
-                    elif (line[0] == "DELETE"):
-                        if (len(line) == 2):
-                            client.delete(line[1])
-                        else:
-                            print("Syntax error. Usage: DELETE <fileName>")
-
-                    elif (line[0] == "LIST_USERS"):
-                        if (len(line) == 1):
-                            client.listusers()
-                        else:
-                            print("Syntax error. Use: LIST_USERS")
-
-                    elif (line[0] == "LIST_CONTENT"):
-                        if (len(line) == 2):
-                            client.listcontent(line[1])
-                        else:
-                            print("Syntax error. Usage: LIST_CONTENT <userName>")
-
-                    elif (line[0] == "DISCONNECT"):
-                        if (len(line) == 2):
-                            client.disconnect(line[1])
-                        else:
-                            print("Syntax error. Usage: DISCONNECT <userName>")
-
-                    elif (line[0] == "GET_FILE"):
-                        if (len(line) == 4):
-                            client.getfile(line[1], line[2], line[3])
-                        else:
-                            print("Syntax error. Usage: GET_FILE <userName> <remote_fileName> <local_fileName>")
-
-                    elif (line[0] == "GET_MULTIFILE"):
-                        if (len(line) == 3):
-                            client.getmultifile(line[1], line[2])
-                        else:
-                            print("Syntax error. Usage: GET_MULTIFILE <remote_fileName> <local_fileName>")
-
-                    elif (line[0] == "QUIT"):
+                with open(input_file, 'r') as f:
+                    for line in f:
+                        command = line.strip()
+                        if not command:
+                            continue
+                        print("c>", command)
+                        client.exec_command(command)
+                        if command.upper() == "QUIT":
+                            break
+            except Exception as e:
+                print("Error reading input file:", str(e))
+            # Si hemos terminado de leer el fichero y no hay más comandos, nos quedamos inactivos
+            # hasta que el usuario decida salir
+            while True:
+                pass
+        else:
+            # Modo interactivo
+            while True:
+                try:
+                    command = input("c> ")
+                    line = command.split(" ")
+                    if (line[0].upper() == "QUIT"):
                         if (len(line) == 1):
                             break
                         else:
                             print("Syntax error. Use: QUIT")
+                    client.exec_command(command)
+                except Exception as e:
+                    print("Exception:", str(e))
 
-                    elif (line[0] == "HELP"):
-                        print("Commands:")
-                        print("\tREGISTER <userName>")
-                        print("\tUNREGISTER <userName>")
-                        print("\tCONNECT <userName>")
-                        print("\tDISCONNECT <userName>")
-                        print("\tPUBLISH <fileName> <description>")
-                        print("\tDELETE <fileName>")
-                        print("\tLIST_USERS")
-                        print("\tLIST_CONTENT <userName>")
-                        print("\tGET_FILE <userName> <remote_fileName> <local_fileName>")
-                        print("\tGET_MULTIFILE <remote_fileName> <local_fileName>")
-                        print("\tQUIT")
+    @staticmethod
+    def exec_command(command: str):
+        line = command.split(" ")
+        if (len(line) > 0):
+            line[0] = line[0].upper()
+            if (line[0] == "REGISTER"):
+                if (len(line) == 2):
+                    client.register(line[1])
+                else:
+                    print("Syntax error. Usage: REGISTER <userName>")
 
-                    else:
-                        print("Error: command " + line[0] + " not valid.")
+            elif (line[0] == "UNREGISTER"):
+                if (len(line) == 2):
+                    client.unregister(line[1])
+                else:
+                    print("Syntax error. Usage: UNREGISTER <userName>")
 
-            except Exception as e:
+            elif (line[0] == "CONNECT"):
+                if (len(line) == 2):
+                    client.connect(line[1])
+                else:
+                    print("Syntax error. Usage: CONNECT <userName>")
 
-                print("Exception: " + str(e))
+            elif (line[0] == "PUBLISH"):
+                if (len(line) >= 3):
+                    #  Remove first two words
+                    description = ' '.join(line[2:])
+                    client.publish(line[1], description)
+                else:
+                    print("Syntax error. Usage: PUBLISH <fileName> <description>")
 
+            elif (line[0] == "DELETE"):
+                if (len(line) == 2):
+                    client.delete(line[1])
+                else:
+                    print("Syntax error. Usage: DELETE <fileName>")
+
+            elif (line[0] == "LIST_USERS"):
+                if (len(line) == 1):
+                    client.listusers()
+                else:
+                    print("Syntax error. Use: LIST_USERS")
+
+            elif (line[0] == "LIST_CONTENT"):
+                if (len(line) == 2):
+                    client.listcontent(line[1])
+                else:
+                    print("Syntax error. Usage: LIST_CONTENT <userName>")
+
+            elif (line[0] == "DISCONNECT"):
+                if (len(line) == 2):
+                    client.disconnect(line[1])
+                else:
+                    print("Syntax error. Usage: DISCONNECT <userName>")
+
+            elif (line[0] == "GET_FILE"):
+                if (len(line) == 4):
+                    client.getfile(line[1], line[2], line[3])
+                else:
+                    print("Syntax error. Usage: GET_FILE <userName> <remote_fileName> <local_fileName>")
+
+            elif (line[0] == "GET_MULTIFILE"):
+                if (len(line) == 3):
+                    client.getmultifile(line[1], line[2])
+                else:
+                    print("Syntax error. Usage: GET_MULTIFILE <remote_fileName> <local_fileName>")
+
+            elif (line[0] == "QUIT"):
+                if (len(line) == 1):
+                    pass
+                else:
+                    print("Syntax error. Use: QUIT")
+
+            elif (line[0] == "HELP"):
+                print("Commands:")
+                print("\tREGISTER <userName>")
+                print("\tUNREGISTER <userName>")
+                print("\tCONNECT <userName>")
+                print("\tDISCONNECT <userName>")
+                print("\tPUBLISH <fileName> <description>")
+                print("\tDELETE <fileName>")
+                print("\tLIST_USERS")
+                print("\tLIST_CONTENT <userName>")
+                print("\tGET_FILE <userName> <remote_fileName> <local_fileName>")
+                print("\tGET_MULTIFILE <remote_fileName> <local_fileName>")
+                print("\tQUIT")
+
+            else:
+                print("Error: command " + line[0] + " not valid.")
     # *
-
     # * @brief Prints program usage
-
     @staticmethod
     def usage():
 
@@ -835,29 +855,20 @@ class client:
 
     @staticmethod
     def parseArguments(argv):
-
         parser = argparse.ArgumentParser()
-
         parser.add_argument('-s', type=str, required=True, help='Server IP')
-
         parser.add_argument('-p', type=int, required=True, help='Server Port')
-
+        parser.add_argument('--input-file', type=str, required=False, help='Command input file')
         args = parser.parse_args()
-
         if (args.s is None):
             parser.error("Usage: python3 client.py -s <server> -p <port>")
-
             return False
-
         if ((args.p < 1024) or (args.p > 65535)):
-            parser.error("Error: Port must be in the range 1024 <= port <= 65535");
-
-            return False;
-
+            parser.error("Error: Port must be in the range 1024 <= port <= 65535")
+            return False
         client._server = args.s
-
         client._port = args.p
-
+        client._input_file = args.input_file
         return True
 
     @staticmethod
@@ -880,16 +891,12 @@ class client:
 
     @staticmethod
     def main(argv):
-
-        if (not client.parseArguments(argv)):
+        if not client.parseArguments(argv):
             client.usage()
-
             return
-
         signal.signal(signal.SIGINT, client.handle_exit_signal)
         signal.signal(signal.SIGTERM, client.handle_exit_signal)
-
-        client.shell()
+        client.shell(client._input_file)
         client.handle_exit_signal(None, None)
 
 

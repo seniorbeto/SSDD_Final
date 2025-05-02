@@ -1,5 +1,7 @@
 c> c> REGISTER OK
 c> c> CONNECT OK
+c> c> PUBLISH OK
 c> c> LIST_CONTENT OK
+	FILE0: /home/beto/CLionProjects/SSDD_Final/src/autores.txt
 c>
 +++ FINISHED +++

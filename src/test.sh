@@ -40,13 +40,16 @@ run_test() {
   # Ejecutar el cliente, redirigiendo entrada desde $input_file y guardando salida
   python3 client/client.py -s $SERVER_IP -p $SERVER_PORT < "$input_file" > "$output_file" 2>/dev/null
 
-  # Comparar resultado con lo esperado
-  if diff -b -B -q <(sed -E 's/[0-9]{4,5}/PORT/g' "$output_file") \
-                <(sed -E 's/[0-9]{4,5}/PORT/g' "$expected_file") >/dev/null; then
+  normalize_output() {
+    sed -E 's/[0-9]{4,5}/PORT/g' "$1" | \
+    sed -E 's,(FILE).*,\1 PATH,g'
+  }
+
+  if diff -b -B -q <(normalize_output "$output_file") <(normalize_output "$expected_file") >/dev/null; then
       echo -e "${GREEN}OK.${NC}"
-    else
+  else
       echo -e "${RED}Fail.${NC}"
-    fi
+  fi
 }
 
 

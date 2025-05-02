@@ -1,0 +1,4 @@
+c> c> REGISTER OK
+c> c> USER DOES NOT EXIST
+c>
++++ FINISHED +++

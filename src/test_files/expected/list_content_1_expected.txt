@@ -1,0 +1,5 @@
+c> c> REGISTER OK
+c> c> CONNECT OK
+c> c> LIST_CONTENT OK
+c>
++++ FINISHED +++

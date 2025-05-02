@@ -1,0 +1,4 @@
+register beto
+connect beto
+delete autores.txt
+quit

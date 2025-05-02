@@ -1,0 +1,4 @@
+c> c> REGISTER OK
+c> c> CONNECT FAIL, USER DOES NOT EXIST
+c> 
++++ FINISHED +++

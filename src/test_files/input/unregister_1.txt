@@ -1,0 +1,3 @@
+register beto
+unregister beto
+quit

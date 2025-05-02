@@ -159,6 +159,11 @@ class client:
             print("Error: Invalid username length")
             return client.RC.USER_ERROR
 
+        # Comprobamos que el usuario no esté ya conectado
+        if client._current_user_connected is not None:
+            print("c> CONNECT FAIL, USER ALREADY CONNECTED")
+            return client.RC.USER_ERROR
+
         sck = None
         success = False
         try:
@@ -752,7 +757,6 @@ class client:
                         else:
                             print("Syntax error. Usage: PUBLISH <fileName> <description>")
 
-
                     elif (line[0] == "DELETE"):
                         if (len(line) == 2):
                             client.delete(line[1])
@@ -771,15 +775,11 @@ class client:
                         else:
                             print("Syntax error. Usage: LIST_CONTENT <userName>")
 
-
-
                     elif (line[0] == "DISCONNECT"):
                         if (len(line) == 2):
                             client.disconnect(line[1])
                         else:
                             print("Syntax error. Usage: DISCONNECT <userName>")
-
-
 
                     elif (line[0] == "GET_FILE"):
                         if (len(line) == 4):
@@ -813,15 +813,6 @@ class client:
                         print("\tGET_MULTIFILE <remote_fileName> <local_fileName>")
                         print("\tQUIT")
 
-                    elif (line[0] == "SET1"): # DEBUF. QUITAR MÁS ADELANTE
-                        client.register("pepe")
-                        client.connect("pepe")
-                        client.publish("testo.txt", "test")
-                    elif (line[0] == "SET2"): # DEBUF. QUITAR MÁS ADELANTE
-                        client.register("popo")
-                        client.connect("popo")
-                        client.publish("testo.txt", "yo también lo tengo")
-                        client.publish("client.py", "el código fuente")
                     else:
                         print("Error: command " + line[0] + " not valid.")
 

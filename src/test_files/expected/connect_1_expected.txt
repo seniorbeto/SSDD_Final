@@ -1,4 +1,4 @@
 c> c> REGISTER OK
-c> c> USERNAME IN USE
-c>
+c> c> CONNECT OK
+c> 
 +++ FINISHED +++

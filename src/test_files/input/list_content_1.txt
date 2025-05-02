@@ -1,0 +1,4 @@
+register beto
+connect beto
+list_content beto
+quit

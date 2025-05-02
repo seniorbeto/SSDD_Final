@@ -1,0 +1,6 @@
+c> c> REGISTER OK
+c> c> CONNECT OK
+c> c> LIST_USERS OK
+	USER0: beto	127.0.0.1	43729
+c>
++++ FINISHED +++

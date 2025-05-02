@@ -1,0 +1,5 @@
+register beto
+connect beto
+publish autores.txt texto descriptivo
+list_content manolo
+quit

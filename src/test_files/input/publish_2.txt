@@ -1,0 +1,3 @@
+register beto
+publish ./autores.txt descripcción del fichero
+quit

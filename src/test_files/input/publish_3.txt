@@ -1,0 +1,5 @@
+register beto
+connect beto
+publish ./autores.txt descripcción del fichero
+publish ./autores.txt descripcción del fichero
+quit

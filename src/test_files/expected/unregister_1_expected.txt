@@ -1,0 +1,4 @@
+c> c> REGISTER OK
+c> c> UNREGISTER OK
+c>
++++ FINISHED +++

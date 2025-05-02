@@ -1,0 +1,4 @@
+register beto
+connect beto
+connect beto
+quit

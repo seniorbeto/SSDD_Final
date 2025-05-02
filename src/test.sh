@@ -16,7 +16,7 @@ rm -f test_files/output/logs/*.log
 
 start_server() {
   export LOG_RPC_IP=$RPC_SERVICE_IP
-  ./server/cmake-build-release/server "$SERVER_PORT" \
+  ./server/cmake-build-release/server -p "$SERVER_PORT" \
       > test_files/output/logs/server.log 2>&1 &
   SERVER_PID=$!
 }
@@ -61,7 +61,7 @@ LOGGER_PID=$!
 
 # SERVER
 export LOG_RPC_IP=$RPC_SERVICE_IP
-./server/cmake-build-release/server $SERVER_PORT > test_files/output/logs/server.log 2>&1 &
+./server/cmake-build-release/server -p $SERVER_PORT > test_files/output/logs/server.log 2>&1 &
 SERVER_PID=$!
 
 # WEB SERVICE

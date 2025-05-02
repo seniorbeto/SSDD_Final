@@ -547,11 +547,11 @@ void *handle_request(void *arg) {
 }
 
 int main(int argc, char *argv[]) {
-  if (argc != 2) {
-    perror("Uso: ./servidor-sock <puerto>");
+  if (argc != 3 || strcmp(argv[1], "-p") != 0) {
+    fprintf(stderr, "Uso: %s -p <puerto>\n", argv[0]);
     exit(EXIT_FAILURE);
   }
-  __uint16_t port = (__uint16_t) atoi(argv[1]);
+  __uint16_t port = (__uint16_t) atoi(argv[2]);
   // No es necesario comprobar si el puerto es mayor que 65535 porque el tipo de dato
   // __uint16_t no puede almacenar un número mayor que 65535.
   if (port < 1024) {

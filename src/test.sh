@@ -5,6 +5,7 @@ SERVER_PORT=4444
 RPC_SERVICE_IP='localhost'
 
 RED='\033[0;31m'
+PINK='\033[1;35m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
@@ -52,6 +53,7 @@ run_test() {
   fi
 }
 
+echo -e "${PINK}Starting services...${NC}"
 
 # LOGGER (servicio rpc)
 ./logger/cmake-build-release/logger > test_files/output/logs/logger.log 2>&1 &
@@ -65,6 +67,9 @@ SERVER_PID=$!
 # WEB SERVICE
 python3 web_server/web_server.py > test_files/output/logs/web_service.log 2>&1 &
 WEB_SERVICE_PID=$!
+
+sleep 3
+echo -e "${PINK}Done. Running tests...${NC}"
 
 # tests
 run_test "quit" "test_files/input/quit.txt" "test_files/expected/quit_expected.txt"
